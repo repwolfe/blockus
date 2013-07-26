@@ -1,0 +1,42 @@
+<html>
+<head>
+	<title>Blockus</title>
+	<script type="text/javascript" src="gl-matrix-min.js"></script>
+	<script type="text/javascript" src="webgl-utils.js"></script>
+	<script type="text/javascript" src="blockus.js"></script>
+	<script type="text/javascript" src="webgl.js"></script>
+	<!-- Fragment/Pixel Shader -->
+	<script id="shader-fs" type="x-shader/x-fragment">
+		precision mediump float;		// How precise to be with floats
+
+		varying vec4 vColor;			// Interpolated from the vertices
+
+		void main(void) {
+			// Output the color
+			gl_FragColor = vColor;
+		}
+	</script>
+
+	<!-- Vertex Shader -->
+	<script id="shader-vs" type="x-shader/x-vertex">
+		attribute vec3 aVertexPosition;		// Passed  in
+		attribute vec4 aVertexColor;
+
+		uniform mat4 uMVMatrix;		// Model View Matrix
+		uniform mat4 uPMatrix;		// Perspective Matrix
+
+		varying vec4 vColor;
+
+		void main(void) {
+			// Output the vertex transformed by the perspective and model view matrix
+			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+
+			// Pass the vertex's color to pixel shader
+			vColor = aVertexColor;
+		}
+	</script>
+</head>
+<body onload="webGLStart();">
+	<canvas id="canvas" style="border-style: solid; border-width: 1px;" width="500" height="500"/>
+</body>
+</html>
