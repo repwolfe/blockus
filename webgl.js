@@ -124,10 +124,10 @@ function webGLStart() {
 	initGL(canvas);
 	initShaders();
 
-	blockus = new Blockus(gl);
+	blockus = new Blockus(gl, shaderProgram);
 	blockus.init();
 
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 
 	tick();
