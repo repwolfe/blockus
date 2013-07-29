@@ -114,6 +114,7 @@ function setMatrixUniforms() {
 
 function tick() {
 	requestAnimFrame(tick);
+	blockus.update();
 	blockus.draw();
 }
 
@@ -124,11 +125,14 @@ function webGLStart() {
 	initGL(canvas);
 	initShaders();
 
-	blockus = new Blockus(gl, shaderProgram);
+	var pieces = initializePieces(gl, shaderProgram);
+	blockus = new Blockus(gl, shaderProgram, pieces);
 	blockus.init();
 
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
+
+	document.addEventListener("keyup", blockus.onKeyReleased, false);
 
 	tick();
 }

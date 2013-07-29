@@ -1,10 +1,99 @@
+function Piece(gl, shaderProgram, color, vertices, indices) {
+	var _gl = gl;
+	var _shaderProgram = shaderProgram;
+	var _color = color;
+
+	var _flipped = false;
+	var _rotation = 0;
+
+	var _vertexBuffer;
+	var _vertexColorBuffer;
+	var _indexBuffer;
+
+	var _init = function(vertices, indices) {
+		// Vertex Buffer
+		_vertexBuffer = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexBuffer);
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(vertices), _gl.STATIC_DRAW);
+		_vertexBuffer.itemSize = 3;
+		_vertexBuffer.numItems = vertices.length;
+
+		// Vertex Color buffer
+		_vertexColorBuffer = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexColorBuffer);
+
+		var colors = [];
+		for (var i = 0; i < vertices.length; ++i) {
+			colors = colors.concat(color);
+		}
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
+		_vertexColorBuffer.itemSize = 4;
+		_vertexColorBuffer.numItems = colors.length;
+
+		// Index buffer
+		_indexBuffer = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _indexBuffer);
+
+		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
+		_indexBuffer.itemSize = 1;
+		_indexBuffer.numItems = indices.length;
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	};
+
+	this.flip = function() {
+		_flipped = !_flipped;
+	};
+
+	this.rotateLeft = function() {
+		_rotation += Math.PI / 2;
+	};
+
+	this.rotateRight = function() {
+		_rotation -= Math.PI / 2;
+	};
+
+	/**
+	 *
+	 */
+	this.draw = function() {
+	 	_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexBuffer);
+	 	_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _vertexBuffer.itemSize, _gl.FLOAT, false, 0, 0);
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexColorBuffer);
+		_gl.vertexAttribPointer(_shaderProgram.vertexColorAttribute, _vertexColorBuffer.itemSize, _gl.FLOAT, false, 0, 0);
+
+		_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _indexBuffer);
+
+		mvPushMatrix();
+
+		if (_flipped) {
+			mat4.rotate(mvMatrix, mvMatrix, Math.PI, [0, 1, 0]);
+		}
+		mat4.rotate(mvMatrix, mvMatrix, _rotation, [0, 0, 1]);
+		//mat4.translate(mvMatrix, mvMatrix, [-_halfGridSize, -_halfGridSize, 0.0]);
+		setMatrixUniforms();
+		_gl.drawElements(gl.TRIANGLES, _indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+
+		mvPopMatrix();
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	};
+
+	_init(vertices, indices);
+}
 
 /**
  *
  */
-function Blockus(gl, shaderProgram) {
+function Blockus(gl, shaderProgram, pieces) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
+	var _pieces = pieces;
 	var self = this;
 
 	// Grid variables
@@ -52,7 +141,7 @@ function Blockus(gl, shaderProgram) {
 
 		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(vertices), _gl.STATIC_DRAW);
 		_gridVertices.itemSize = 3;
-		_gridVertices.numItems = vertices.length;//3;
+		_gridVertices.numItems = vertices.length;
 
 		// Vertex Color buffer
 		_gridVertexColors = _gl.createBuffer();
@@ -66,9 +155,9 @@ function Blockus(gl, shaderProgram) {
 
 		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
 		_gridVertexColors.itemSize = 4;
-		_gridVertexColors.numItems = colors.length;//3;
+		_gridVertexColors.numItems = colors.length;
 
-		// Index buffers
+		// Index Buffer
 		_gridIndexBuffer = _gl.createBuffer();
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _gridIndexBuffer);
 
@@ -83,6 +172,30 @@ function Blockus(gl, shaderProgram) {
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	};
+
+	this.onKeyReleased = function(event) {
+		switch (event.keyCode) {
+			case 37:
+				// left cursor key
+				pieces.rotateLeft();
+				break;
+			case 39:
+				// right cursor key
+				pieces.rotateRight();
+				break;
+			case 70:
+				// 'f'
+				pieces.flip();
+				break;
+		}
+	};
+
+	/**
+	 *
+	 */
+	this.update = function() {
+
 	};
 
 	/**
@@ -101,6 +214,7 @@ function Blockus(gl, shaderProgram) {
 		mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, -pMatrix[0] * _halfGridSize]);
 
 		_drawGrid();
+		_pieces.draw();
 	};
 
 	/**
