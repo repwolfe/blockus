@@ -74,7 +74,7 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 			mat4.rotate(mvMatrix, mvMatrix, Math.PI, [0, 1, 0]);
 		}
 		mat4.rotate(mvMatrix, mvMatrix, _rotation, [0, 0, 1]);
-		//mat4.translate(mvMatrix, mvMatrix, [-_halfGridSize, -_halfGridSize, 0.0]);
+		//mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, 0.0]);
 		setMatrixUniforms();
 		_gl.drawElements(gl.TRIANGLES, _indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 
@@ -94,6 +94,7 @@ function Blockus(gl, shaderProgram, pieces) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 	var _pieces = pieces;
+	var _currentPiece = _pieces[0][_pieces[0].length - 1];
 	var self = this;
 
 	// Grid variables
@@ -178,15 +179,15 @@ function Blockus(gl, shaderProgram, pieces) {
 		switch (event.keyCode) {
 			case 37:
 				// left cursor key
-				pieces.rotateLeft();
+				_currentPiece.rotateLeft();
 				break;
 			case 39:
 				// right cursor key
-				pieces.rotateRight();
+				_currentPiece.rotateRight();
 				break;
 			case 70:
 				// 'f'
-				pieces.flip();
+				_currentPiece.flip();
 				break;
 		}
 	};
@@ -214,7 +215,7 @@ function Blockus(gl, shaderProgram, pieces) {
 		mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, -pMatrix[0] * _halfGridSize]);
 
 		_drawGrid();
-		_pieces.draw();
+		_currentPiece.draw();
 	};
 
 	/**
