@@ -160,8 +160,10 @@ function webGLStart() {
 	initGL(canvas);
 	initShaders();
 
-	var pieces = initializePieces(gl, shaderProgram);
-	blockus = new Blockus(gl, shaderProgram, pieces);
+	var gridSize = 20;		// 20x20 board
+
+	var pieces = initializePieces(gl, shaderProgram, gridSize);
+	blockus = new Blockus(gl, shaderProgram, gridSize, pieces);
 	blockus.init();
 
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);

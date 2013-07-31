@@ -1,7 +1,9 @@
-function Piece(gl, shaderProgram, color, vertices, indices) {
+function Piece(gl, shaderProgram, color, vertices, indices, loc) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 	var _color = color;
+
+	var _loc = (typeof loc !== 'undefined' ? loc : [0,0]);
 
 	var _flipped = false;
 	var _rotation = 0;
@@ -69,10 +71,44 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 	};
 
 	/**
-	 * Draws this piece at the location of the mouse
-	 * @param mousePosition [x,y] location of the mouse, in world coordinates
+	 * Moves this piece at the given location
 	 */
-	this.draw = function(mousePosition) {
+	this.setLocation = function(loc) {
+		_loc = loc;
+	};
+
+	/**
+	 * Draws this piece at its location
+	 */
+	this.draw = function() {
+		_drawAtLocation(_loc);
+	};
+
+	/**
+	 * Draws this piece at the given mouse location
+	 * @param position [x,y] location of the mouse, in world coordinates
+	 */
+	this.drawAtMouse = function(position) {
+		// Offset the piece so that the bottom left block of the piece is centered
+		// on the location of the mouse
+		var coefficient = (_flipped ? -1 : 1);
+		var offsetX = -0.5 * coefficient;
+		if (_rotation >= Math.PI / 2 && _rotation <= Math.PI) {
+			offsetX = 0.5 * coefficient;
+		}
+		var offsetY = -0.5;
+		if (_rotation >= Math.PI && _rotation <= 3 * Math.PI / 2) {
+			offsetY = 0.5;
+		}
+		_drawAtLocation([position[0] + offsetX, position[1] + offsetY]);
+	};
+
+	/**
+	 * @private
+	 * Draws this piece at the given location
+	 * @param position [x,y] location to draw the piece in world coordinates
+	 */
+	var _drawAtLocation = function(position) {
 	 	_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexBuffer);
 	 	_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _vertexBuffer.itemSize, _gl.FLOAT, false, 0, 0);
 
@@ -85,20 +121,8 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 
 		// Transformations have to be in the opposite order desired
 
-		// Offset the piece so that the bottom left block of the piece is centered
-		// on the location of the mouse
-		var coefficient = (_flipped ? -1 : 1);
-		var offsetX = -0.5 * coefficient;
-		if (_rotation >= Math.PI / 2 && _rotation <= Math.PI) {
-			offsetX = 0.5 * coefficient;
-		}
-		var offsetY = -0.5;
-		if (_rotation >= Math.PI && _rotation <= 3 * Math.PI / 2) {
-			offsetY = 0.5;
-		}
-
-		// 3) Move the piece to the mouse location plus the offset calculated above
-		mat4.translate(mvMatrix, mvMatrix, [mousePosition[0] + offsetX, - mousePosition[1] + offsetY, 0.0]);
+		// 3) Move the piece to the given location
+		mat4.translate(mvMatrix, mvMatrix, [position[0], position[1], 0.0]);
 		
 		// 2) Flips the piece in the Y axis
 		if (_flipped) {
@@ -123,7 +147,7 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 /**
  *
  */
-function Blockus(gl, shaderProgram, pieces) {
+function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 
@@ -246,7 +270,7 @@ function Blockus(gl, shaderProgram, pieces) {
 
 		// Convert to world coordinates
 		x = (x / _gl.canvas.height) * _gridSize;	// Equivalent to (x / _gl.canvas.width) * (aspectRatio) * _gridSize);
-		y = ((y - _gl.canvas.height) / _gl.canvas.height) * _gridSize;		// Start y at the bottom not the top of screen
+		y = ((_gl.canvas.height - y) / _gl.canvas.height) * _gridSize;		// Start y at the bottom not the top of screen
 
 		_mousePosition = [x, y];
 	};
@@ -288,7 +312,8 @@ function Blockus(gl, shaderProgram, pieces) {
 		mat4.translate(mvMatrix, mvMatrix, [-xOffset, -yOffset, -zOffset]);
 
 		_drawGrid();
-		_currentPiece.draw(_mousePosition);
+		_currentPiece.drawAtMouse(_mousePosition);
+		_drawAvailablePieces();
 	};
 
 	/**
@@ -305,14 +330,22 @@ function Blockus(gl, shaderProgram, pieces) {
 
 		_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _gridIndexBuffer);
 
-		mvPushMatrix();
-
 		setMatrixUniforms();
 		_gl.drawElements(gl.LINES, _gridIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-
-		mvPopMatrix();
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
 	 };
+
+	/**
+	 * @private
+	 */
+	var _drawAvailablePieces = function() {
+		var index = _availablePieces.indexOf(_currentPiece);
+
+		for (var i = 0; i < _availablePieces.length; ++i) {
+			if (i == index) continue;
+			_availablePieces[i].draw();
+		}
+	};
 }
