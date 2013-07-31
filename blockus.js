@@ -126,8 +126,12 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 function Blockus(gl, shaderProgram, pieces) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
+
+	// Piece variables
 	var _pieces = pieces;
-	var _currentPiece = _pieces[0][_pieces[0].length - 1];
+	var _availablePieces = _pieces[0];
+	var _currentPiece = _availablePieces[_availablePieces.length - 1];
+
 	var self = this;
 
 	// Grid variables
@@ -156,19 +160,21 @@ function Blockus(gl, shaderProgram, pieces) {
 	 * @private
 	 * Sets the buffers for the grid
 	 */
-	var _initGridBuffers = function() { 
+	var _initGridBuffers = function() {
 		// Vertex buffer
 		_gridVertices = _gl.createBuffer();
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, _gridVertices);
 
 		var vertices = [];
+		var numHorizontal 	= _gridSize;
+		var numVertical 	= _gridSize + 1;		// Also want at the edge of the board
 		// Horizontal Lines
-		for (var i = 0; i < _gridSize; ++i) {
+		for (var i = 0; i < numHorizontal; ++i) {
 			vertices = vertices.concat([0.0, i, 0.0]);
 			vertices = vertices.concat([_gridSize, i, 0.0]);
 		}
 		// Vertical lines
-		for (var i = 0; i < _gridSize; ++i) {
+		for (var i = 0; i < numVertical; ++i) {
 			vertices = vertices.concat([i, 0.0, 0.0]);
 			vertices = vertices.concat([i, _gridSize, 0.0]);
 		}
@@ -196,7 +202,7 @@ function Blockus(gl, shaderProgram, pieces) {
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _gridIndexBuffer);
 
 		var indices = [];
-		for (var i = 0; i < _gridSize * 2; ++i) {
+		for (var i = 0; i < numHorizontal + numVertical; ++i) {
 			indices = indices.concat([(i*2), (i*2)+1]);
 		}
 
@@ -239,8 +245,8 @@ function Blockus(gl, shaderProgram, pieces) {
 		var y = pos[1];
 
 		// Convert to world coordinates
-		x = ((2 * x / _gl.canvas.width) - 1) * _halfGridSize;		// first -1 to 1 then
-		y = ((2 * y / _gl.canvas.height) - 1) * _halfGridSize;		// -halfGridSize to halfGridSize
+		x = (x / _gl.canvas.height) * _gridSize;	// Equivalent to (x / _gl.canvas.width) * (aspectRatio) * _gridSize);
+		y = ((y - _gl.canvas.height) / _gl.canvas.height) * _gridSize;		// Start y at the bottom not the top of screen
 
 		_mousePosition = [x, y];
 	};
@@ -259,13 +265,27 @@ function Blockus(gl, shaderProgram, pieces) {
 		_gl.viewport(0, 0, _gl.viewportWidth, _gl.viewportHeight);
 		_gl.clear(_gl.COLOR_BUFFER_BIT | _gl.DEPTH_BUFFER_BIT);
 
+		var aspectRatio = _gl.viewportWidth / _gl.viewportHeight;
 		mat4.perspective(pMatrix, degToRad(45), _gl.viewportWidth / _gl.viewportHeight, 0.1, 100.0);
 
 		mat4.identity(mvMatrix);
 
-		// pMatrix[0] is how far to zoom to get -1 to 1 units of screen size
-		// Zoom enough to get -_halfGridSize to _halfGridSize
-		mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, -pMatrix[0] * _halfGridSize]);
+		// Get the origin to be at the bottom left corner of the screen and have
+		// 20 units in the y axis, regardless of the width of the canvas
+
+		// pMatrix[0] takes the aspect ratio into account, ignore it
+		// and multiply this value by half the grid size. If we zoom out this amount
+		// the y axis will be -halfGridSize to halfGridSize
+		var zOffset = pMatrix[0] * aspectRatio * _halfGridSize;
+
+		// Shift down this amount to half the axis be 0 to gridSize
+		var yOffset = _halfGridSize;
+
+		// Determine how many units in the x axis we have, and shift left by half that
+		// The following is equivalent to _gl.canvas.width / (_gl.canvas.height / _gridSize) * 0.5
+		var xOffset = aspectRatio * _gridSize * 0.5;
+
+		mat4.translate(mvMatrix, mvMatrix, [-xOffset, -yOffset, -zOffset]);
 
 		_drawGrid();
 		_currentPiece.draw(_mousePosition);
@@ -287,7 +307,6 @@ function Blockus(gl, shaderProgram, pieces) {
 
 		mvPushMatrix();
 
-		mat4.translate(mvMatrix, mvMatrix, [-_halfGridSize, -_halfGridSize, 0.0]);
 		setMatrixUniforms();
 		_gl.drawElements(gl.LINES, _gridIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 
