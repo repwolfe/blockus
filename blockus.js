@@ -48,18 +48,31 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 		_flipped = !_flipped;
 	};
 
+	/**
+	 * Keeps rotation angle between 0 and 2Pi
+	 */
 	this.rotateLeft = function() {
 		_rotation += Math.PI / 2;
-	};
-
-	this.rotateRight = function() {
-		_rotation -= Math.PI / 2;
+		if (_rotation == 2 * Math.PI) {
+			_rotation = 0;
+		}
 	};
 
 	/**
-	 *
+	 * Keeps rotation angle between 0 and 2Pi
 	 */
-	this.draw = function() {
+	this.rotateRight = function() {
+		_rotation -= Math.PI / 2;
+		if (_rotation == - Math.PI / 2) {
+			_rotation = 3 * Math.PI / 2;
+		}
+	};
+
+	/**
+	 * Draws this piece at the location of the mouse
+	 * @param mousePosition [x,y] location of the mouse, in world coordinates
+	 */
+	this.draw = function(mousePosition) {
 	 	_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexBuffer);
 	 	_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _vertexBuffer.itemSize, _gl.FLOAT, false, 0, 0);
 
@@ -70,11 +83,31 @@ function Piece(gl, shaderProgram, color, vertices, indices) {
 
 		mvPushMatrix();
 
+		// Transformations have to be in the opposite order desired
+
+		// Offset the piece so that the bottom left block of the piece is centered
+		// on the location of the mouse
+		var coefficient = (_flipped ? -1 : 1);
+		var offsetX = -0.5 * coefficient;
+		if (_rotation >= Math.PI / 2 && _rotation <= Math.PI) {
+			offsetX = 0.5 * coefficient;
+		}
+		var offsetY = -0.5;
+		if (_rotation >= Math.PI && _rotation <= 3 * Math.PI / 2) {
+			offsetY = 0.5;
+		}
+
+		// 3) Move the piece to the mouse location plus the offset calculated above
+		mat4.translate(mvMatrix, mvMatrix, [mousePosition[0] + offsetX, - mousePosition[1] + offsetY, 0.0]);
+		
+		// 2) Flips the piece in the Y axis
 		if (_flipped) {
 			mat4.rotate(mvMatrix, mvMatrix, Math.PI, [0, 1, 0]);
 		}
+
+		// 1) Rotates the piece
 		mat4.rotate(mvMatrix, mvMatrix, _rotation, [0, 0, 1]);
-		//mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, 0.0]);
+
 		setMatrixUniforms();
 		_gl.drawElements(gl.TRIANGLES, _indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 
@@ -175,6 +208,9 @@ function Blockus(gl, shaderProgram, pieces) {
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
 	};
 
+	/**
+	 * Event handler for keys being clicked
+	 */
 	this.onKeyReleased = function(event) {
 		switch (event.keyCode) {
 			case 37:
@@ -190,6 +226,23 @@ function Blockus(gl, shaderProgram, pieces) {
 				_currentPiece.flip();
 				break;
 		}
+	};
+
+	var _mousePosition = [0, 0];
+
+	/**
+	 * Updates the current mouse position
+	 * Stores it in world coordinates as opposed to the pixel location on the canvas
+	 */
+	this.setMousePosition = function(pos) {
+		var x = pos[0];
+		var y = pos[1];
+
+		// Convert to world coordinates
+		x = ((2 * x / _gl.canvas.width) - 1) * _halfGridSize;		// first -1 to 1 then
+		y = ((2 * y / _gl.canvas.height) - 1) * _halfGridSize;		// -halfGridSize to halfGridSize
+
+		_mousePosition = [x, y];
 	};
 
 	/**
@@ -215,7 +268,7 @@ function Blockus(gl, shaderProgram, pieces) {
 		mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, -pMatrix[0] * _halfGridSize]);
 
 		_drawGrid();
-		_currentPiece.draw();
+		_currentPiece.draw(_mousePosition);
 	};
 
 	/**

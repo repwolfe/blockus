@@ -112,6 +112,39 @@ function setMatrixUniforms() {
 	gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
 }
 
+/**
+ * Convenience function to get the cursors position
+ */
+function getCursorPosition(e) {
+	var x, y;
+	if (e.pageX || e.pageY) {
+		x = e.pageX;
+		y = e.pageY;
+	}
+	else {
+		x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+		y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+	}
+	x -= $("canvas").offsetLeft;
+	y -= $("canvas").offsetTop;
+
+	return [x, y];
+}
+
+/**
+ * Event handler when the mouse is moved over the canvas
+ */
+function canvasMouseMove(e) {
+	blockus.setMousePosition(getCursorPosition(e));
+}
+
+/**
+ * Event handler when a mouse click occurs
+ */
+function canvasClick(e) {
+	return;
+}
+
 function tick() {
 	requestAnimFrame(tick);
 	blockus.update();
@@ -121,7 +154,9 @@ function tick() {
 var blockus;
 
 function webGLStart() {
-	var canvas = $("canvas");
+	var canvas = $("canvas");	
+	canvas.addEventListener("mousemove", canvasMouseMove, false);
+	canvas.addEventListener("mouseup", canvasClick, false);
 	initGL(canvas);
 	initShaders();
 
