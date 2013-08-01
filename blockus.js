@@ -1,9 +1,14 @@
-function Piece(gl, shaderProgram, color, vertices, indices, loc) {
+function Point(x_, y_) {
+	this.x = x_;
+	this.y = y_;
+}
+
+function Piece(gl, shaderProgram, color, vertices, indices) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 	var _color = color;
 
-	var _loc = (typeof loc !== 'undefined' ? loc : [0,0]);
+	var _loc = new Point(0,0);
 
 	var _flipped = false;
 	var _rotation = 0;
@@ -71,7 +76,16 @@ function Piece(gl, shaderProgram, color, vertices, indices, loc) {
 	};
 
 	/**
+	 * Removes any flips or rotations
+	 */
+	this.reset = function() {
+		_flipped = false;
+		_rotation = 0;
+	};
+
+	/**
 	 * Moves this piece at the given location
+	 * @param loc Point object
 	 */
 	this.setLocation = function(loc) {
 		_loc = loc;
@@ -100,7 +114,7 @@ function Piece(gl, shaderProgram, color, vertices, indices, loc) {
 		if (_rotation >= Math.PI && _rotation <= 3 * Math.PI / 2) {
 			offsetY = 0.5;
 		}
-		_drawAtLocation([position[0] + offsetX, position[1] + offsetY]);
+		_drawAtLocation(new Point(position.x + offsetX, position.y + offsetY));
 	};
 
 	/**
@@ -122,7 +136,7 @@ function Piece(gl, shaderProgram, color, vertices, indices, loc) {
 		// Transformations have to be in the opposite order desired
 
 		// 3) Move the piece to the given location
-		mat4.translate(mvMatrix, mvMatrix, [position[0], position[1], 0.0]);
+		mat4.translate(mvMatrix, mvMatrix, [position.x, position.y, 0.0]);
 		
 		// 2) Flips the piece in the Y axis
 		if (_flipped) {
@@ -154,7 +168,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	// Piece variables
 	var _pieces = pieces;
 	var _availablePieces = _pieces[0];
-	var _currentPiece = _availablePieces[_availablePieces.length - 1];
+	var _currentPiece = _availablePieces.length - 1;	// Index
 
 	var self = this;
 
@@ -165,11 +179,25 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gridVertexColors;
 	var _gridIndexBuffer;
 
+	// Scroll button
+	var _scrollVertices;
+	var _scrollVertexColors;
+	var _scrollTriangleIndices;
+	var _scrollSquareIndices;
+
+	var _rightPiecesMarginX = 6;
+	var _rightPiecesMarginY = 4;
+
+	var _mousePosition = [];	// Empty object
+
 	/**
 	 * Initializes the game
 	 */
 	this.init = function() {
 		_initBuffers();
+		_arrangeAvailablePieces();
+		_mousePosition.x = 0;
+		_mousePosition.y = 0;
 	};
 
 	/**
@@ -178,6 +206,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 */
 	var _initBuffers = function() {
 		_initGridBuffers();
+		_initScrollBuffers();
 	};
 
 	/**
@@ -239,26 +268,92 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	};
 
 	/**
+	 * @private
+	 * Sets the buffers for the scroll button
+	 */
+	var _initScrollBuffers = function() {
+		// Vertex buffer
+		_scrollVertices = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _scrollVertices);
+
+		var vertices = [
+			// Arrow
+			0.2, 0.7, 0.0,
+			0.8, 0.7, 0.0,
+			0.5, 0.2, 0.0,
+
+			// Square for button
+			0.0, 0.0, 0.0,
+			0.0, 1.0, 0.0,
+			1.0, 1.0, 0.0,
+			1.0, 0.0, 0.0
+		];
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(vertices), _gl.STATIC_DRAW);
+		_scrollVertices.itemSize = 3;
+		_scrollVertices.numItems = vertices.length;
+
+		// Vertex Color buffer
+		_scrollVertexColors = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _scrollVertexColors);
+
+		var colors = [];
+		for (var i = 0; i < vertices.length; ++i) {
+			// Black gridlines
+			colors = colors.concat([0.0, 0.0, 0.0, 1.0]);
+		}
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
+		_scrollVertexColors.itemSize = 4;
+		_scrollVertexColors.numItems = colors.length;
+
+		// Index Buffers
+		_scrollTriangleIndices = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _scrollTriangleIndices);
+
+		var indices = [0, 1, 2];
+
+		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
+		_scrollTriangleIndices.itemSize = 1;
+		_scrollTriangleIndices.numItems = indices.length;
+
+		_scrollSquareIndices = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _scrollSquareIndices);
+
+		indices = [
+			3, 4,
+			4, 5,
+			5, 6,
+			6, 3
+		];
+
+		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
+		_scrollSquareIndices.itemSize = 1;
+		_scrollSquareIndices.numItems = indices.length;
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	};
+
+	/**
 	 * Event handler for keys being clicked
 	 */
 	this.onKeyReleased = function(event) {
 		switch (event.keyCode) {
 			case 37:
 				// left cursor key
-				_currentPiece.rotateLeft();
+				_availablePieces[_currentPiece].rotateLeft();
 				break;
 			case 39:
 				// right cursor key
-				_currentPiece.rotateRight();
+				_availablePieces[_currentPiece].rotateRight();
 				break;
 			case 70:
 				// 'f'
-				_currentPiece.flip();
+				_availablePieces[_currentPiece].flip();
 				break;
 		}
 	};
-
-	var _mousePosition = [0, 0];
 
 	/**
 	 * Updates the current mouse position
@@ -272,7 +367,60 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		x = (x / _gl.canvas.height) * _gridSize;	// Equivalent to (x / _gl.canvas.width) * (aspectRatio) * _gridSize);
 		y = ((_gl.canvas.height - y) / _gl.canvas.height) * _gridSize;		// Start y at the bottom not the top of screen
 
-		_mousePosition = [x, y];
+		_mousePosition.x = x;
+		_mousePosition.y = y;
+	};
+
+	/**
+	 *
+	 */
+	this.mouseDown = function() {
+
+	};
+
+	/**
+	 *
+	 */
+	this.mouseClicked = function() {
+		// Potentially clicked on the scroll button at edge of screen
+		if (_mousePosition.x  > (_gl.canvas.width / _gl.canvas.height) * _gridSize - 1) {
+			if (_mousePosition.y < 1) {
+				// Scroll down
+				var maxScroll = Math.floor(_availablePieces.length / 4);
+				_scrollAmount += 1;
+				if (_scrollAmount > maxScroll) {
+					_scrollAmount = maxScroll;
+				}
+				else {
+					_arrangeAvailablePieces();
+				}
+			}
+			else if (_mousePosition.y > _gridSize - 1) {
+				// Scroll up
+				_scrollAmount -= 1;
+				if (_scrollAmount < 0) {
+					_scrollAmount = 0;
+				}
+				else {
+					_arrangeAvailablePieces();
+				}
+			}
+		}
+		// Clicked on the remaining pieces to select one
+		else if (_mousePosition.x > _gridSize) {
+			var columnNum = Math.floor((_mousePosition.x - _gridSize) / _rightPiecesMarginX);
+
+			// Invert y since starting from top, and accoun for scroll
+			var rowNum = Math.floor(	
+				(_gridSize - (_mousePosition.y - _rightPiecesMarginY * _scrollAmount)) / _rightPiecesMarginY
+			);
+			
+			// Calculate index of new selected piece
+			_availablePieces[_currentPiece].reset();
+			_currentPiece = rowNum * 2 + columnNum;
+		}
+
+
 	};
 
 	/**
@@ -312,7 +460,8 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		mat4.translate(mvMatrix, mvMatrix, [-xOffset, -yOffset, -zOffset]);
 
 		_drawGrid();
-		_currentPiece.drawAtMouse(_mousePosition);
+		_drawScrollButtons();
+		_availablePieces[_currentPiece].drawAtMouse(_mousePosition);
 		_drawAvailablePieces();
 	};
 
@@ -335,16 +484,64 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
-	 };
+	};
+
+	/**
+	* @private
+	*/
+	var _drawScrollButtons = function() {
+		 _gl.bindBuffer(_gl.ARRAY_BUFFER, _scrollVertices);
+		_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _scrollVertices.itemSize, _gl.FLOAT, false, 0, 0);
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _scrollVertexColors);
+		_gl.vertexAttribPointer(_shaderProgram.vertexColorAttribute, _scrollVertexColors.itemSize, _gl.FLOAT, false, 0, 0);
+
+		mvPushMatrix();
+
+		var xOffsets = [(_gl.canvas.width / _gl.canvas.height) * _gridSize - 1, 1.0];
+		var yOffsets = [0.0, _gridSize];
+		var rotations = [0.0, Math.PI];
+
+		for (var i = 0; i < yOffsets.length; ++i) {
+			mat4.translate(mvMatrix, mvMatrix, [xOffsets[i], yOffsets[i], 0.0]);
+			mat4.rotate(mvMatrix, mvMatrix, rotations[i], [0.0, 0.0, 1]);
+
+			setMatrixUniforms();
+
+			_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _scrollSquareIndices);
+			_gl.drawElements(gl.LINES, _scrollSquareIndices.numItems, gl.UNSIGNED_SHORT, 0);
+
+			_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _scrollTriangleIndices);
+			_gl.drawElements(gl.TRIANGLES, _scrollTriangleIndices.numItems, gl.UNSIGNED_SHORT, 0);
+		}
+		mvPopMatrix();
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null); 	
+	};
+
+	var _scrollAmount = 0;
+	var _arrangeAvailablePieces = function() {
+		var multiplier = 1;
+		var yMult = 0;
+		var xStart = gridSize + 1;
+		var yStart = gridSize - 3 + _scrollAmount * _rightPiecesMarginY;
+
+		for (var i = 0; i < _availablePieces.length; ++i) {
+			_availablePieces[i].setLocation(new Point(
+				xStart + (multiplier % 2 == 0 ? _rightPiecesMarginX : 0),
+			 	yStart - (multiplier % 2 == 0 ? yMult++ * _rightPiecesMarginY : yMult * _rightPiecesMarginY))
+			);
+			++multiplier;
+		}
+	};
 
 	/**
 	 * @private
 	 */
 	var _drawAvailablePieces = function() {
-		var index = _availablePieces.indexOf(_currentPiece);
-
 		for (var i = 0; i < _availablePieces.length; ++i) {
-			if (i == index) continue;
+			if (i == _currentPiece) continue;
 			_availablePieces[i].draw();
 		}
 	};

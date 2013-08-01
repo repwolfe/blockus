@@ -139,10 +139,17 @@ function canvasMouseMove(e) {
 }
 
 /**
+ * Event handler when the mouse is pressed down
+ */
+function canvasMouseDown(e) {
+	blockus.mouseDown();
+}
+
+/**
  * Event handler when a mouse click occurs
  */
 function canvasClick(e) {
-	return;
+	blockus.mouseClicked();
 }
 
 function tick() {
@@ -156,6 +163,7 @@ var blockus;
 function webGLStart() {
 	var canvas = $("canvas");	
 	canvas.addEventListener("mousemove", canvasMouseMove, false);
+	canvas.addEventListener("mousedown", canvasMouseDown, false);
 	canvas.addEventListener("mouseup", canvasClick, false);
 	initGL(canvas);
 	initShaders();
