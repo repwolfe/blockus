@@ -172,7 +172,6 @@ function webGLStart() {
 
 	var pieces = initializePieces(gl, shaderProgram, gridSize);
 	blockus = new Blockus(gl, shaderProgram, gridSize, pieces);
-	blockus.init();
 
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);

@@ -28,7 +28,8 @@ function initializePieces(gl, shaderProgram, gridSize) {
 			[
 				0, 3, 1,
 				0, 2, 3
-			]
+			],
+			[0, 0]
 		));
 		// Two Piece
 		colorsPieces.push(new Piece(
@@ -46,6 +47,10 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				0, 2, 3,
 				1, 5, 4,
 				1, 3, 5
+			],
+			[
+				0, 0,
+				1, 0
 			]
 		));
 		// Three L Piece
@@ -68,6 +73,11 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				1, 3, 5,
 				1, 4, 6,
 				6, 4, 7
+			],
+			[
+				0, 0,
+				1, 0,
+				1, -1
 			]
 		));
 		// Three Piece
@@ -90,6 +100,11 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				1, 3, 5,
 				4, 5, 7,
 				6, 4, 7
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0
 			]
 		));
 		// Four Square Piece
@@ -115,6 +130,12 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				2, 6, 7,
 				3, 8, 5,
 				3, 7, 8
+			],
+			[
+				0, 0,
+				1, 0,
+				0, 1,
+				1, 1
 			]
 		));
 		// Four _|_ Piece
@@ -141,6 +162,12 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				4, 5, 7,
 				3, 9, 5,
 				3, 8, 9
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				1, 1
 			]
 		));
 		// Four Straight Piece
@@ -167,9 +194,15 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				4, 5, 7,
 				6, 9, 8,
 				6, 7, 9
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				3, 0
 			]
 		));
-		// Five L Piece
+		// Four L Piece
 		colorsPieces.push(new Piece(
 			gl, shaderProgram, color,
 			[
@@ -193,6 +226,12 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				4, 5, 7,
 				5, 9, 7,
 				5, 8, 9
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				2, 1
 			]
 		));
 		// Four S Piece
@@ -219,6 +258,12 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				3, 6, 7,
 				5, 9, 8,
 				5, 7, 9
+			],
+			[
+				0, 0,
+				1, 0,
+				1, 1,
+				2, 1
 			]
 		));
 		// Five |_____ Piece
@@ -249,6 +294,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				6, 7, 9,
 				2, 11, 3,
 				2, 10, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				3, 0,
+				0, 1
 			]
 		));
 		// Five T Piece
@@ -279,6 +331,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				3, 8, 9,
 				8, 11, 9,
 				8, 10, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				1, 1,
+				1, 2
 			]
 		));
 		// Five L Piece
@@ -309,9 +368,16 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				2, 8, 9,
 				8, 11, 9,
 				8, 10, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				0, 1,
+				0, 2
 			]
 		));
-		// Five L Piece
+		// Five S Piece
 		colorsPieces.push(new Piece(
 			gl, shaderProgram, color,
 			[
@@ -339,7 +405,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				5, 7, 9,
 				8, 11, 10,
 				8, 9, 11
-			]
+			],
+			[
+				0, 0,
+				1, 0,
+				1, 1,
+				2, 1,
+				3, 1]
 		));
 		// Z Piece
 		colorsPieces.push(new Piece(
@@ -377,6 +449,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 
 				7, 10, 11,
 				7, 11, 9
+			],
+			[
+				0, 0,
+				0, 1,
+				1, 1,
+				2, 1,
+				2, 2
 			]
 		));
 		// Five Straight Piece
@@ -407,6 +486,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				6, 7, 9,
 				8, 11, 10,
 				8, 9, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				3, 0,
+				4, 0
 			]
 		));
 		// Five *
@@ -438,6 +524,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				3, 7, 8,
 				6, 10, 7,
 				6, 9, 10
+			],
+			[
+				0, 0,
+				1, 0,
+				0, 1,
+				1, 1,
+				0, 2
 			]
 		));
 		// Five W piece
@@ -468,6 +561,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				5, 8, 9,
 				7, 11, 10,
 				7, 9, 11
+			],
+			[
+				0, 0,
+				0, 1,
+				1, 1,
+				1, 2,
+				2, 2
 			]
 		));
 		// 5 C Piece
@@ -498,6 +598,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				6, 8, 9,
 				7, 11, 10,
 				7, 9, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				0, 1,
+				0, 2,
+				1, 2
 			]
 		))
 		// Five  **
@@ -530,6 +637,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				3, 9, 5,
 				5, 11, 10,
 				5, 9, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				1, -1,
+				1, 1,
+				2, 1
 			]
 		));
 		// Five Cross Piece
@@ -560,11 +674,17 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				3, 9, 5,
 				4, 11, 10,
 				4, 5, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				1, -1,
+				1, 1
 			]
 		));
 		// Five *
 		//     **** Piece
-				// Five Cross Piece
 		colorsPieces.push(new Piece(
 			gl, shaderProgram, color,
 			[
@@ -592,6 +712,13 @@ function initializePieces(gl, shaderProgram, gridSize) {
 				6, 7, 9,
 				3, 11, 5,
 				3, 10, 11
+			],
+			[
+				0, 0,
+				1, 0,
+				2, 0,
+				3, 0,
+				1, 1
 			]
 		));
 
