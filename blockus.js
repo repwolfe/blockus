@@ -17,6 +17,10 @@ function Point(x_, y_) {
 		var newY = Math.sin(angle) * (this.x - originX) + Math.cos(angle) * (this.y - originY) + originY;
 		return new Point(newX, newY);
 	};
+
+	this.equals = function(other) {
+		return this.x == other.x && this.y == other.y;
+	};
 }
 
 function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
@@ -296,6 +300,10 @@ function Player(pieces) {
 		return _currentPiece != NONE;
 	};
 
+	this.getCurrentPiece = function() {
+		return _availablePieces[_currentPiece];
+	};
+
 	this.setCurrentPiece = function(piece) {
 		_currentPiece = piece;
 	};
@@ -373,17 +381,26 @@ function Board(size) {
 
 	var EMPTY 	= '#';
 	var BLUE 	= 'B';
+	var YELLOW	= 'Y';
 	var RED 	= 'R';
 	var GREEN 	= 'G';
-	var YELLOW	= 'Y';
 
-	var colorMap = {};
+	var _colorMap = {};			// RGB color -> color code
+	var _startedMap = {};		// Color code -> First move or not
+	var _firstPieceMap = {};	// Color code -> Location of first piece
 
 	var _init = function() {
-		colorMap[[0.0, 0.0, 1.0, 1.0]] = BLUE;
-		colorMap[[1.0, 0.0, 0.0, 1.0]] = RED;
-		colorMap[[1.0, 1.0, 0.0, 1.0]] = YELLOW;
-		colorMap[[0.0, 1.0, 0.0, 1.0]] = GREEN;
+		_colorMap[[0.0, 0.0, 1.0, 1.0]] = BLUE;
+		_colorMap[[1.0, 1.0, 0.0, 1.0]] = YELLOW;
+		_colorMap[[1.0, 0.0, 0.0, 1.0]] = RED;
+		_colorMap[[0.0, 1.0, 0.0, 1.0]] = GREEN;
+
+		_startedMap[BLUE] = _startedMap[RED] = _startedMap[GREEN] = _startedMap[YELLOW] = false;
+
+		_firstPieceMap[BLUE] 	= new Point(0, _gridSize - 1);					// Top left corner
+		_firstPieceMap[YELLOW] 	= new Point(_gridSize - 1, _gridSize - 1);		// Top right corner
+		_firstPieceMap[RED] 	= new Point(_gridSize - 1, 0);					// Bottom right corner
+		_firstPieceMap[GREEN] 	= new Point(0, 0);								// Bottom right corner
 
 		for (var i = 0; i < _gridSize; ++i) {
 			_board[i] = new Array(_gridSize);
@@ -394,8 +411,85 @@ function Board(size) {
 	};
 
 	var _getColorCode = function(piece) {
-		return colorMap[piece.getColor()];
+		return _colorMap[piece.getColor()];
 	}
+
+	/**
+	 * @returns true if this is a valid move for this piece, false otherwise
+	 */
+	this.canPlacePiece = function(piece, x, y) {
+		var color = _getColorCode(piece);
+		var pointsOfCenters = piece.getPointsOfCenters();
+
+		if (_startedMap[color]) {
+			return _validateMove(color, pointsOfCenters, x, y);
+		}
+		else {
+			return _checkFirstMove(color, pointsOfCenters, x, y);
+		}
+	};
+
+	/**
+	 * If this isn't the players first move, returns if a given move is valid
+	 */
+	var _validateMove = function(color, pointsOfCenters, x, y) {
+		var touchedCorner = false;		// Must turn true to be a valid move
+
+		// Go through each block of the piece
+		for (var z = 0; z < pointsOfCenters.length; ++z) {
+			var block = pointsOfCenters[z];
+			var location = new Point(x + block.x, y + block.y);
+
+			for (var j = 1; j > -2; --j) {
+				for (var i = -1; i < 2; ++i) {
+					var newX = location.x + i;
+					var newY = location.y + j;
+
+					// Check if outside the board
+					if (newX < 0 || newY < 0 || newX >= _gridSize || newY >= _gridSize) continue;
+
+					// If checking self, make sure its empty
+					if (i == 0 && j == 0) {
+						if (_board[newX][newY] != EMPTY) {
+							return false;
+						}
+					}
+					// If 'x' direction check to see if same color exists, needs to happen at least once to be a valid move
+					else if (Math.abs(i) == Math.abs(j)) {
+						if (touchedCorner) {
+							continue;		// Don't bother checking
+						}
+						else {
+							touchedCorner = (_board[newX][newY] == color);
+						}
+					}
+					// If '+' direction check to see if same same color exists, if so, that's an invalid move
+					else if (_board[newX][newY] == color) {
+						return false;
+					}
+				}
+			}
+		}
+
+		return touchedCorner;
+	};
+
+	/**
+	 * Every piece has a corner that their first move has to touch
+	 */
+	var _checkFirstMove = function(color, pointsOfCenters, x, y) {
+		var firstPieceLocation = _firstPieceMap[color];
+
+		for (var z = 0; z < pointsOfCenters.length; ++z) {
+			var block = pointsOfCenters[z];
+			var location = new Point(x + block.x, y + block.y);
+			if (location.equals(firstPieceLocation)) {
+				_startedMap[color] = true;
+				return true;
+			}
+		}
+		return false;		// None of the blocks touched the first location
+	};
 
 	/**
 	 *
@@ -706,14 +800,18 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 				var row = Math.floor(_mousePosition.x);
 				var column = Math.floor(_mousePosition.y);
 
-				var placedPiece = _players[_currentPlayer].placeCurrentPiece();
-				_gameBoard.placePiece(placedPiece, row, column);
-				placedPiece.placeAt(new Point(_mousePosition.x, _mousePosition.y));
-				_placedPieces = _placedPieces.concat(placedPiece);
-				_arrangeAvailablePieces();
+				// Check if this is a valid move
+				if (_gameBoard.canPlacePiece(_players[_currentPlayer].getCurrentPiece(), row, column)) {
+					var placedPiece = _players[_currentPlayer].placeCurrentPiece();
+					_gameBoard.placePiece(placedPiece, row, column);
+					placedPiece.placeAt(new Point(_mousePosition.x, _mousePosition.y));
+					_placedPieces = _placedPieces.concat(placedPiece);
+					_scrollAmount = 0;
+					_arrangeAvailablePieces();
 
-				// Next player
-				_currentPlayer = (_currentPlayer + 1) % 4;
+					// Next player
+					_currentPlayer = (_currentPlayer + 1) % 4;
+				}
 			}
 		}
 	};
