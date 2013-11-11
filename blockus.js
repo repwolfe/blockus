@@ -410,9 +410,20 @@ function Board(size) {
 		}
 	};
 
+	/**
+	 * @private
+	 */
 	var _getColorCode = function(piece) {
 		return _colorMap[piece.getColor()];
-	}
+	};
+
+	/**
+	 * @private
+	 * @returns true if the given coordinates are out of bounds, else false
+	 */
+	var _isOutOfBounds = function(x, y) {
+		return x < 0 || y < 0 || x >= _gridSize || y >= _gridSize;
+	};
 
 	/**
 	 * @returns true if this is a valid move for this piece, false otherwise
@@ -430,6 +441,7 @@ function Board(size) {
 	};
 
 	/**
+	 * @private
 	 * If this isn't the players first move, returns if a given move is valid
 	 */
 	var _validateMove = function(color, pointsOfCenters, x, y) {
@@ -440,13 +452,17 @@ function Board(size) {
 			var block = pointsOfCenters[z];
 			var location = new Point(x + block.x, y + block.y);
 
+			if (_isOutOfBounds(location.x, location.y)) {
+				return false;
+			}
+
 			for (var j = 1; j > -2; --j) {
 				for (var i = -1; i < 2; ++i) {
 					var newX = location.x + i;
 					var newY = location.y + j;
 
-					// Check if outside the board
-					if (newX < 0 || newY < 0 || newX >= _gridSize || newY >= _gridSize) continue;
+					// Check if outside the board, if so continue since no issue
+					if (_isOutOfBounds(newX, newY)) continue;
 
 					// If checking self, make sure its empty
 					if (i == 0 && j == 0) {
@@ -454,7 +470,7 @@ function Board(size) {
 							return false;
 						}
 					}
-					// If 'x' direction check to see if same color exists, needs to happen at least once to be a valid move
+					// If 'x' direction, check to see if same color exists, needs to happen at least once to be a valid move
 					else if (Math.abs(i) == Math.abs(j)) {
 						if (touchedCorner) {
 							continue;		// Don't bother checking
@@ -463,7 +479,7 @@ function Board(size) {
 							touchedCorner = (_board[newX][newY] == color);
 						}
 					}
-					// If '+' direction check to see if same same color exists, if so, that's an invalid move
+					// If '+' direction, check to see if same same color exists, if so, that's an invalid move
 					else if (_board[newX][newY] == color) {
 						return false;
 					}
@@ -476,19 +492,29 @@ function Board(size) {
 
 	/**
 	 * Every piece has a corner that their first move has to touch
+	 * Check if any of the blocks of this piece touch the first location
+	 * as long as the piece didn't go out of bounds
 	 */
 	var _checkFirstMove = function(color, pointsOfCenters, x, y) {
 		var firstPieceLocation = _firstPieceMap[color];
+		var success = false;
 
 		for (var z = 0; z < pointsOfCenters.length; ++z) {
 			var block = pointsOfCenters[z];
 			var location = new Point(x + block.x, y + block.y);
+			if (_isOutOfBounds(location.x, location.y)) {
+				return false;
+			}
 			if (location.equals(firstPieceLocation)) {
-				_startedMap[color] = true;
-				return true;
+				success = true;
 			}
 		}
-		return false;		// None of the blocks touched the first location
+
+		// If made it to the end without going out of bounds
+		if (success) {
+			_startedMap[color] = true;
+		}
+		return success;		// None of the blocks touched the first location
 	};
 
 	/**
