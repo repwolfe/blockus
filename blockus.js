@@ -568,6 +568,9 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gridVertices;
 	var _gridVertexColors;
 	var _gridIndexBuffer;
+	var _startingPVertices;	// Variables for the starting piece hints
+	var _startingPVertexColors;
+	var _startingPIndexBuffer;
 
 	// Scroll buttons
 	var _scrollVertices;
@@ -644,14 +647,15 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, _gridVertexColors);
 
 		var colors = [];
-		for (var i = 0; i < vertices.length; ++i) {
+		var numVertices = vertices.length / _gridVertices.itemSize;
+		for (var i = 0; i < numVertices; ++i) {
 			// Black gridlines
 			colors = colors.concat([0.0, 0.0, 0.0, 1.0]);
 		}
 
 		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
 		_gridVertexColors.itemSize = 4;
-		_gridVertexColors.numItems = colors.length;
+		_gridVertexColors.numItems = numVertices;
 
 		// Index Buffer
 		_gridIndexBuffer = _gl.createBuffer();
@@ -665,6 +669,77 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
 		_gridIndexBuffer.itemSize = 1;
 		_gridIndexBuffer.numItems = indices.length;
+
+		// Starting piece hint vertices
+		_startingPVertices = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertices);
+
+		vertices = [
+			0.0, _gridSize, 0.0,
+			1.0, _gridSize, 0.0,
+			0.0, _gridSize - 1, 0.0,
+			1.0, _gridSize - 1, 0.0,
+
+			_gridSize - 1.0, _gridSize, 0.0,
+			_gridSize, _gridSize, 0.0,
+			_gridSize - 1.0, _gridSize - 1.0, 0.0,
+			_gridSize, _gridSize - 1.0, 0.0,
+
+			_gridSize - 1.0, 1.0, 0.0,
+			_gridSize, 1.0, 0.0,
+			_gridSize - 1.0, 0.0, 0.0,
+			_gridSize, 0.0, 0.0,
+
+			0.0, 1.0, 0.0,
+			1.0, 1.0, 0.0,
+			0.0, 0.0, 0.0,
+			1.0, 0.0, 0.0,
+		];
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(vertices), _gl.STATIC_DRAW);
+		_startingPVertices.itemSize = 3;
+		_startingPVertices.numItems = vertices.length;
+
+		// Starting piece hint vertex colors
+		_startingPVertexColors = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertexColors);
+
+		colors = [];
+		numVertices = vertices.length / _startingPVertices.itemSize;
+		var hintColors = [
+			[0.0, 0.0, 1.0, 0.3],
+			[1.0, 1.0, 0.0, 0.3],
+			[1.0, 0.0, 0.0, 0.3],
+			[0.0, 1.0, 0.0, 0.3]
+		];
+		var hintColorIndex = -1;
+		for (var i = 0; i < numVertices; ++i) {
+			if (i % 4 == 0) ++hintColorIndex;
+			colors = colors.concat(hintColors[hintColorIndex]);
+		}
+
+		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
+		_startingPVertexColors.itemSize = 4;
+		_startingPVertexColors.numItems = colors.length;
+
+		// Starting piece hint index buffer		
+		_startingPIndexBuffer = _gl.createBuffer();
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _startingPIndexBuffer);
+
+		indices = [
+			0, 1, 2,
+			2, 1, 3,
+			4, 5, 6,
+			6, 5, 7,
+			8, 9, 10,
+			10, 9, 11,
+			12, 13, 14,
+			14, 13, 15
+		];
+
+		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
+		_startingPIndexBuffer.itemSize = 1;
+		_startingPIndexBuffer.numItems = indices.length;
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
@@ -883,13 +958,14 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		_players[_currentPlayer].draw(_mousePosition);
 		_players[_currentPlayer].drawAvailablePieces();
 		_drawPlacedPieces();
+		_drawStartingPieceHint();
 	};
 
 	/**
-	* @private
-	* Draws the gridlines of the board
-	* The size of the grid depends on the board dimensions, the number of cells is constant
-	*/
+	 * @private
+	 * Draws the gridlines of the board
+	 * The size of the grid depends on the board dimensions, the number of cells is constant
+	 */
 	var _drawGrid = function() {
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, _gridVertices);
 		_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _gridVertices.itemSize, _gl.FLOAT, false, 0, 0);
@@ -902,6 +978,26 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		setMatrixUniforms();
 		_gl.drawElements(gl.LINES, _gridIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
+		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	};
+
+	/**
+	 * @private
+	 * Starting piece hints
+	 */
+	var _drawStartingPieceHint = function() {
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertices);
+		_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _startingPVertices.itemSize, _gl.FLOAT, false, 0, 0);
+
+		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertexColors);
+		_gl.vertexAttribPointer(_shaderProgram.vertexColorAttribute, _startingPVertexColors.itemSize, _gl.FLOAT, false, 0, 0);
+
+		_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _startingPIndexBuffer);
+
+		setMatrixUniforms();
+		_gl.drawElements(gl.TRIANGLES, _startingPIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+		
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
 	};
