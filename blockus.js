@@ -291,6 +291,7 @@ function Player(pieces) {
 	var _availablePieces = pieces;
 	var NONE = -1;
 	var _currentPiece = NONE;
+	var _availableMoves = [];
 	var self = this;
 
 	this.getNumAvailablePieces = function() {
@@ -354,6 +355,13 @@ function Player(pieces) {
 	};
 
 	/**
+	 * Adds the given moves to the list of available moves
+	 */
+	this.addNewAvailableMoves = function(moves) {
+		_availableMoves = _availableMoves.concat(moves);
+	};
+
+	/**
 	 * Draws the current piece at the location of the mouse
 	 */
 	this.draw = function(mousePosition) {
@@ -369,6 +377,15 @@ function Player(pieces) {
 		for (var i = 0; i < _availablePieces.length; ++i) {
 			if (i == _currentPiece) continue;
 			_availablePieces[i].draw();
+		}
+	};
+
+	/**
+	 * Draws all the available moves this player has
+	 */
+	this.drawAvailableMoves = function() {
+		for (var i = 0; i < _availableMoves.length; ++i) {
+			_availableMoves[i].draw();
 		}
 	};
 }
@@ -532,6 +549,78 @@ function Board(size) {
 	};
 
 	/**
+	 * After a piece is placed, determine all the new available pieces that
+	 * are now possible
+	 */
+	this.discoverNewAvailableMoves = function(piece, x, y) {
+		var newMoves = [];
+		var checkedSpots = [];		// Avoid redundant checks
+		
+		var color = _getColorCode(piece);
+		var pointsOfCenters = piece.getPointsOfCenters();
+
+		for (var z = 0; z < pointsOfCenters.length; ++z) {
+			// For each block of a piece, check in X direction for empty space
+			var block = pointsOfCenters[z];
+			var location = new Point(x + block.x, y + block.y);
+
+			for (var j = 1; j > -2; --j) {
+				for (var i = -1; i < 2; ++i) {
+					// If 'x' direction, check to see if the spot is empty
+					if (Math.abs(i) == Math.abs(j)) {
+						var newX = location.x + i;
+						var newY = location.y + j;
+						var newLoc = new Point(newX, newY);
+
+						// Check if outside the board, if so not a new move
+						if (_isOutOfBounds(newX, newY)) continue;
+
+						if (_board[newX][newY] == EMPTY) {
+							// If it's empty, see if we've checked this spot before
+							if (checkedSpots.indexOf(newLoc) > -1) {
+								continue;
+							}
+
+							var newMoveWorks = true;
+
+							// If not, then check this spot's + directions to see if it's adjacent to this piece's color
+							for (var l = 1; l > -2; --l) {
+								for (var k = -1; k < 2; ++k) {
+									if (k != l && Math.abs(k) != Math.abs(l)) {
+										var checkX = newX + k;
+										var checkY = newY + l;
+
+										// Check if outside the board, if so continue since no issue
+										if (_isOutOfBounds(checkX, checkY)) continue;
+
+										if (_board[checkX][checkY] == color) {
+											newMoveWorks = false;
+											break;
+										}
+									}
+								}
+								if (!newMoveWorks) {
+									break;
+								}
+							}
+
+							// If made it this far, this is a new move
+							if (newMoveWorks) {
+								newMoves = newMoves.concat(newLoc);
+							}
+
+							// Make sure we don't check this spot again
+							checkedSpots = checkedSpots.concat(newLoc);
+						}
+					}
+				}
+			}
+		}
+
+		return newMoves;
+	}
+
+	/**
 	 * @debug
 	 */
 	this.printBoard = function() {
@@ -586,12 +675,23 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 	var _mousePosition = [];	// Empty object
 
+	var _lightPlayerColors;
+
 	/**
 	 * @private
 	 * Initializes the game
 	 */
 	var _init = function(pieces) {
 		_gameBoard = new Board(_gridSize);
+
+		_lightPlayerColors = [
+			[0.0, 0.0, 1.0, 0.3],
+			[1.0, 1.0, 0.0, 0.5],
+			[1.0, 0.0, 0.0, 0.3],
+			[0.0, 1.0, 0.0, 0.3]
+		];
+
+
 		_initPlayers(pieces);
 		_initStartingHintPieces();
 		_initBuffers();
@@ -606,7 +706,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 * Used for displaying hints as to where to place a piece
 	 *
 	 * @param color [r,g,b] of the piece to display
-	 * @param pos [x,y] position to display the top left corner of the piece
+	 * @param pos either Point or array [x,y] position to display the top left corner of the piece
 	 * @returns the created piece
 	 */
 	var _createSquarePiece = function(color, pos) {
@@ -622,7 +722,12 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 				0, 2, 3
 			]
 		);
-		p.setLocation(new Point(pos[0], pos[1]));
+		if (pos instanceof Point) {
+			p.setLocation(pos);
+		}
+		else {
+			p.setLocation(new Point(pos[0], pos[1]));
+		}
 		return p;
 	};
 
@@ -631,12 +736,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 * Initializes the pieces to display to hint to the player where to start playing
 	 */
 	var _initStartingHintPieces = function() {
-		var colors = [
-			[0.0, 0.0, 1.0, 0.3],
-			[1.0, 1.0, 0.0, 0.3],
-			[1.0, 0.0, 0.0, 0.3],
-			[0.0, 1.0, 0.0, 0.3]
-		];
 		var positions = [
 			[0, _gridSize - 1],
 			[_gridSize - 1, _gridSize - 1],
@@ -644,7 +743,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			[0, 0]
 		];
 		for (var i = 0; i < _players.length; ++i) {
-			_startingHintPieces = _startingHintPieces.concat(_createSquarePiece(colors[i], positions[i]));
+			_startingHintPieces = _startingHintPieces.concat(_createSquarePiece(_lightPlayerColors[i], positions[i]));
 		}
 	};
 
@@ -884,12 +983,20 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 				// Check if this is a valid move
 				if (_gameBoard.canPlacePiece(_players[_currentPlayer].getCurrentPiece(), row, column)) {
+					// Place the piece on the model of the board
 					var placedPiece = _players[_currentPlayer].placeCurrentPiece();
 					_gameBoard.placePiece(placedPiece, row, column);
+
+					// Position the visual piece on the screen
 					placedPiece.placeAt(new Point(_mousePosition.x, _mousePosition.y));
+
+					// Update GUI
 					_placedPieces = _placedPieces.concat(placedPiece);
 					_scrollAmount = 0;
 					_arrangeAvailablePieces();
+					
+					// Update the available moves list
+					_addNewAvailableMoves(_gameBoard.discoverNewAvailableMoves(placedPiece, row, column));
 
 					// Next player
 					_currentPlayer = (_currentPlayer + 1) % 4;
@@ -975,6 +1082,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 				_startingHintPieces[i].draw();
 			}
 		}
+		_players[_currentPlayer].drawAvailableMoves();
 	};
 
 	/**
@@ -1033,6 +1141,18 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			++multiplier;
 		}
 		_players[playerIndex].arrangeAvailablePieces(newLocations);
+	};
+
+	/**
+	 * @private
+	 * Takes the given available moves, creates displayable pieces and gives them to the current player
+	 */
+	var _addNewAvailableMoves = function(moves) {
+		var pieces = [];
+		for (var i = 0; i < moves.length; ++i) {
+			pieces = pieces.concat(_createSquarePiece(_lightPlayerColors[_currentPlayer], moves[i]));
+		}
+		_players[_currentPlayer].addNewAvailableMoves(pieces);
 	};
 
 	/**
