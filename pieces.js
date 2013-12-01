@@ -722,7 +722,7 @@ function initializePieces(gl, shaderProgram, gridSize) {
 			]
 		));
 
-		pieces.push(colorsPieces);
+		pieces.push(colorsPieces/*.reverse()*/);	// Have largest pieces first
 	}
 	return pieces;
 }

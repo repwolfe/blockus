@@ -61,7 +61,8 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, _vertexColorBuffer);
 
 		var colors = [];
-		for (var i = 0; i < vertices.length; ++i) {
+		var numVertices = vertices.length / _vertexBuffer.itemSize;
+		for (var i = 0; i < numVertices; ++i) {
 			colors = colors.concat(color);
 		}
 
@@ -161,7 +162,7 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	};
 
 	/**
-	 * Moves this piece at the given location
+	 * Moves the top left corner of the piece to the given location
 	 * @param loc Point object
 	 */
 	this.setLocation = function(loc) {
@@ -555,6 +556,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 	var _players = [];
 	var _currentPlayer = 0;
+	var _firstRound = true;		// Not all players have placed their first piece
 
 	var _gameBoard;
 
@@ -568,9 +570,9 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gridVertices;
 	var _gridVertexColors;
 	var _gridIndexBuffer;
-	var _startingPVertices;	// Variables for the starting piece hints
-	var _startingPVertexColors;
-	var _startingPIndexBuffer;
+
+	// Hint pieces that are displayed
+	var _startingHintPieces = [];
 
 	// Scroll buttons
 	var _scrollVertices;
@@ -591,9 +593,59 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _init = function(pieces) {
 		_gameBoard = new Board(_gridSize);
 		_initPlayers(pieces);
+		_initStartingHintPieces();
 		_initBuffers();
 		_mousePosition.x = 0;
 		_mousePosition.y = 0;
+	};
+
+	/**
+	 * @private
+	 * Convenience function to create a displayable piece
+	 * that takes up one square
+	 * Used for displaying hints as to where to place a piece
+	 *
+	 * @param color [r,g,b] of the piece to display
+	 * @param pos [x,y] position to display the top left corner of the piece
+	 * @returns the created piece
+	 */
+	var _createSquarePiece = function(color, pos) {
+		var p = new Piece(_gl, _shaderProgram, color,
+			[
+				0, 0, 0,
+				1, 0, 0,
+				0, 1, 0,
+				1, 1, 0
+			],
+			[
+				0, 3, 1,
+				0, 2, 3
+			]
+		);
+		p.setLocation(new Point(pos[0], pos[1]));
+		return p;
+	};
+
+	/**
+	 * @private
+	 * Initializes the pieces to display to hint to the player where to start playing
+	 */
+	var _initStartingHintPieces = function() {
+		var colors = [
+			[0.0, 0.0, 1.0, 0.3],
+			[1.0, 1.0, 0.0, 0.3],
+			[1.0, 0.0, 0.0, 0.3],
+			[0.0, 1.0, 0.0, 0.3]
+		];
+		var positions = [
+			[0, _gridSize - 1],
+			[_gridSize - 1, _gridSize - 1],
+			[_gridSize - 1, 0],
+			[0, 0]
+		];
+		for (var i = 0; i < _players.length; ++i) {
+			_startingHintPieces = _startingHintPieces.concat(_createSquarePiece(colors[i], positions[i]));
+		}
 	};
 
 	/**
@@ -669,77 +721,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
 		_gridIndexBuffer.itemSize = 1;
 		_gridIndexBuffer.numItems = indices.length;
-
-		// Starting piece hint vertices
-		_startingPVertices = _gl.createBuffer();
-		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertices);
-
-		vertices = [
-			0.0, _gridSize, 0.0,
-			1.0, _gridSize, 0.0,
-			0.0, _gridSize - 1, 0.0,
-			1.0, _gridSize - 1, 0.0,
-
-			_gridSize - 1.0, _gridSize, 0.0,
-			_gridSize, _gridSize, 0.0,
-			_gridSize - 1.0, _gridSize - 1.0, 0.0,
-			_gridSize, _gridSize - 1.0, 0.0,
-
-			_gridSize - 1.0, 1.0, 0.0,
-			_gridSize, 1.0, 0.0,
-			_gridSize - 1.0, 0.0, 0.0,
-			_gridSize, 0.0, 0.0,
-
-			0.0, 1.0, 0.0,
-			1.0, 1.0, 0.0,
-			0.0, 0.0, 0.0,
-			1.0, 0.0, 0.0,
-		];
-
-		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(vertices), _gl.STATIC_DRAW);
-		_startingPVertices.itemSize = 3;
-		_startingPVertices.numItems = vertices.length;
-
-		// Starting piece hint vertex colors
-		_startingPVertexColors = _gl.createBuffer();
-		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertexColors);
-
-		colors = [];
-		numVertices = vertices.length / _startingPVertices.itemSize;
-		var hintColors = [
-			[0.0, 0.0, 1.0, 0.3],
-			[1.0, 1.0, 0.0, 0.3],
-			[1.0, 0.0, 0.0, 0.3],
-			[0.0, 1.0, 0.0, 0.3]
-		];
-		var hintColorIndex = -1;
-		for (var i = 0; i < numVertices; ++i) {
-			if (i % 4 == 0) ++hintColorIndex;
-			colors = colors.concat(hintColors[hintColorIndex]);
-		}
-
-		_gl.bufferData(_gl.ARRAY_BUFFER, new Float32Array(colors), _gl.STATIC_DRAW);
-		_startingPVertexColors.itemSize = 4;
-		_startingPVertexColors.numItems = colors.length;
-
-		// Starting piece hint index buffer		
-		_startingPIndexBuffer = _gl.createBuffer();
-		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, _startingPIndexBuffer);
-
-		indices = [
-			0, 1, 2,
-			2, 1, 3,
-			4, 5, 6,
-			6, 5, 7,
-			8, 9, 10,
-			10, 9, 11,
-			12, 13, 14,
-			14, 13, 15
-		];
-
-		_gl.bufferData(_gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), _gl.STATIC_DRAW);
-		_startingPIndexBuffer.itemSize = 1;
-		_startingPIndexBuffer.numItems = indices.length;
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
@@ -912,6 +893,9 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 					// Next player
 					_currentPlayer = (_currentPlayer + 1) % 4;
+					if (_firstRound && _currentPlayer == 0) {
+						_firstRound = false;
+					}
 				}
 			}
 		}
@@ -958,7 +942,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		_players[_currentPlayer].draw(_mousePosition);
 		_players[_currentPlayer].drawAvailablePieces();
 		_drawPlacedPieces();
-		_drawStartingPieceHint();
+		_drawHintPieces();
 	};
 
 	/**
@@ -984,22 +968,13 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 	/**
 	 * @private
-	 * Starting piece hints
 	 */
-	var _drawStartingPieceHint = function() {
-		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertices);
-		_gl.vertexAttribPointer(_shaderProgram.vertexPositionAttribute, _startingPVertices.itemSize, _gl.FLOAT, false, 0, 0);
-
-		_gl.bindBuffer(_gl.ARRAY_BUFFER, _startingPVertexColors);
-		_gl.vertexAttribPointer(_shaderProgram.vertexColorAttribute, _startingPVertexColors.itemSize, _gl.FLOAT, false, 0, 0);
-
-		_gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _startingPIndexBuffer);
-
-		setMatrixUniforms();
-		_gl.drawElements(gl.TRIANGLES, _startingPIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-		
-		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
-		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
+	var _drawHintPieces = function() {
+		if (_firstRound) {
+			for (var i = 0; i < _startingHintPieces.length; ++i) {
+				_startingHintPieces[i].draw();
+			}
+		}
 	};
 
 	/**
