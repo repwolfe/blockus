@@ -1,3 +1,5 @@
+var DEBUG = false;
+
 function Point(x_, y_) {
 	this.x = x_;
 	this.y = y_;
@@ -170,6 +172,13 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	};
 
 	/**
+	 * Returns the top left corner of the piece
+	 */
+	this.getLocation = function() {
+		return _loc;
+	};
+
+	/**
 	 * Sets the location of this piece at the mouse position,
 	 * but depending on the rotation adjusts it to the next whole location
 	 */
@@ -286,13 +295,20 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 
 /**
  * Represents an individual player
+ * @param pieces a list of the pieces at this player's disposal
+ * @param availableMoves a ready made container that is set up to store available moves
  */
-function Player(pieces) {
+function Player(pieces, availableMoves) {
 	var _availablePieces = pieces;
 	var NONE = -1;
 	var _currentPiece = NONE;
-	var _availableMoves = [];
+	var _numAvailableMoves = 1;					// Convenience variable to keep track of how many available moves remain
+	var _availableMoves = availableMoves;		// 2D Array of pieces, where the indices are the board locations
 	var self = this;
+
+	this.getNumAvailableMoves = function() {
+		return _numAvailableMoves;
+	};
 
 	this.getNumAvailablePieces = function() {
 		return _availablePieces.length;
@@ -355,10 +371,26 @@ function Player(pieces) {
 	};
 
 	/**
-	 * Adds the given moves to the list of available moves
+	 * Adds the given moves to the list of available moves if they don't already exist
 	 */
 	this.addNewAvailableMoves = function(moves) {
-		_availableMoves = _availableMoves.concat(moves);
+		for (var i = 0; i < moves.length; ++i) {
+			var loc = moves[i].getLocation();
+			if (_availableMoves[loc.x][loc.y] == null) {
+				_availableMoves[loc.x][loc.y] = moves[i];
+				++_numAvailableMoves;
+			}
+		}
+	};
+
+	/**
+	 * Removes the available move stored at the given location
+	 */
+	this.removeAvailableMove = function(pos) {
+		if (_availableMoves[pos.x][pos.y] != null) {
+			_availableMoves[pos.x][pos.y] = null;
+			--_numAvailableMoves;
+		}
 	};
 
 	/**
@@ -385,7 +417,11 @@ function Player(pieces) {
 	 */
 	this.drawAvailableMoves = function() {
 		for (var i = 0; i < _availableMoves.length; ++i) {
-			_availableMoves[i].draw();
+			for (var j = 0; j < _availableMoves[i].length; ++j) {
+				if (_availableMoves[i][j] != null) {
+					_availableMoves[i][j].draw();
+				}
+			}
 		}
 	};
 }
@@ -545,7 +581,9 @@ function Board(size) {
 			var piece = pointsOfCenters[i];
 			_board[x + piece.x][y + piece.y] = color;
 		}
-		this.printBoard();
+		if (DEBUG) {
+			this.printBoard();
+		}
 	};
 
 	/**
@@ -643,6 +681,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 
+	var _NUM_PLAYERS = 4;
 	var _players = [];
 	var _currentPlayer = 0;
 	var _firstRound = true;		// Not all players have placed their first piece
@@ -659,9 +698,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	var _gridVertices;
 	var _gridVertexColors;
 	var _gridIndexBuffer;
-
-	// Hint pieces that are displayed
-	var _startingHintPieces = [];
 
 	// Scroll buttons
 	var _scrollVertices;
@@ -691,9 +727,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			[0.0, 1.0, 0.0, 0.3]
 		];
 
-
 		_initPlayers(pieces);
-		_initStartingHintPieces();
 		_initBuffers();
 		_mousePosition.x = 0;
 		_mousePosition.y = 0;
@@ -733,26 +767,33 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 	/**
 	 * @private
-	 * Initializes the pieces to display to hint to the player where to start playing
+	 * Creates and initializes all the players
+	 * First it sets up the available moves for each player on startup
 	 */
-	var _initStartingHintPieces = function() {
+	var _initPlayers = function(pieces) {
+		// Set up each player's first available moves
+		var firstMoves = new Array(_NUM_PLAYERS);
 		var positions = [
 			[0, _gridSize - 1],
 			[_gridSize - 1, _gridSize - 1],
 			[_gridSize - 1, 0],
 			[0, 0]
 		];
-		for (var i = 0; i < _players.length; ++i) {
-			_startingHintPieces = _startingHintPieces.concat(_createSquarePiece(_lightPlayerColors[i], positions[i]));
+		for (var i = 0; i < _NUM_PLAYERS; ++i) {
+			firstMoves[i] = _createSquarePiece(_lightPlayerColors[i], positions[i]);
 		}
-	};
 
-	/**
-	 * @private
-	 */
-	var _initPlayers = function(pieces) {
-		for (var i = 0; i < 4; ++i) {
-			_players = _players.concat(new Player(pieces[i]));
+		// Create each player, passing the necessary data
+		for (var i = 0; i < _NUM_PLAYERS; ++i) {
+			// Give each player a ready made 2D array
+			var availableMoves = new Array(_gridSize);
+			for (var j = 0; j < _gridSize; ++j) {
+				availableMoves[j] = new Array(_gridSize);
+			}
+			// Give each player their first move
+			availableMoves[positions[i][0]][positions[i][1]] = firstMoves[i];
+
+			_players = _players.concat(new Player(pieces[i], availableMoves));
 			_arrangeAvailablePieces(i);
 		}
 	};
@@ -996,7 +1037,13 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 					_arrangeAvailablePieces();
 					
 					// Update the available moves list
+					_removeAvailableMoves(placedPiece, row, column);
 					_addNewAvailableMoves(_gameBoard.discoverNewAvailableMoves(placedPiece, row, column));
+
+					if (DEBUG) {
+						console.log("B: " + _players[0].getNumAvailableMoves() + " Y: " + _players[1].getNumAvailableMoves() + " R: " + 
+							_players[2].getNumAvailableMoves() + " G: " + _players[3].getNumAvailableMoves());
+					}
 
 					// Next player
 					_currentPlayer = (_currentPlayer + 1) % 4;
@@ -1044,12 +1091,26 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 		mat4.translate(mvMatrix, mvMatrix, [-xOffset, -yOffset, -zOffset]);
 
+		// Draw the GUI
 		_drawGrid();
 		_drawScrollButtons();
+
+		// Draw the player's currently selected piece, its remaining pieces and available moves
 		_players[_currentPlayer].draw(_mousePosition);
 		_players[_currentPlayer].drawAvailablePieces();
+
+		if (!DEBUG) {
+			_players[_currentPlayer].drawAvailableMoves();
+		}
+		else {
+			// Draw all players' available moves
+			for (var i = 0; i < _NUM_PLAYERS; ++i) {
+				_players[i].drawAvailableMoves();
+			}
+		}
+		
+		// Draw all the pieces currently on the board
 		_drawPlacedPieces();
-		_drawHintPieces();
 	};
 
 	/**
@@ -1071,18 +1132,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 		_gl.bindBuffer(_gl.ARRAY_BUFFER, null);
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
-	};
-
-	/**
-	 * @private
-	 */
-	var _drawHintPieces = function() {
-		if (_firstRound) {
-			for (var i = 0; i < _startingHintPieces.length; ++i) {
-				_startingHintPieces[i].draw();
-			}
-		}
-		_players[_currentPlayer].drawAvailableMoves();
 	};
 
 	/**
@@ -1153,6 +1202,23 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			pieces = pieces.concat(_createSquarePiece(_lightPlayerColors[_currentPlayer], moves[i]));
 		}
 		_players[_currentPlayer].addNewAvailableMoves(pieces);
+	};
+
+	/**
+	 * @private
+	 * When a piece is placed, all of its squares are no longer an available move for any
+	 * player. Attempts to remove them from every player's list
+	 * @param pos the position of the placed piece
+	 */
+	var _removeAvailableMoves = function(piece, row, column) {
+		var pointsOfCenters = piece.getPointsOfCenters();
+		for (var i = 0; i < pointsOfCenters.length; ++i) {
+			var block = pointsOfCenters[i];
+			var location = new Point(row + block.x, column + block.y);
+			for (var j = 0; j < _NUM_PLAYERS; ++j) {
+				_players[j].removeAvailableMove(location);
+			}
+		}
 	};
 
 	/**
