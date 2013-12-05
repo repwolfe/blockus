@@ -1,4 +1,4 @@
-var DEBUG = false;
+var DEBUG = true;
 
 function Point(x_, y_) {
 	this.x = x_;
@@ -304,7 +304,6 @@ function Player(pieces, availableMoves) {
 	var _currentPiece = NONE;
 	var _numAvailableMoves = 1;					// Convenience variable to keep track of how many available moves remain
 	var _availableMoves = availableMoves;		// 2D Array of pieces, where the indices are the board locations
-	var self = this;
 
 	this.getNumAvailableMoves = function() {
 		return _numAvailableMoves;
@@ -433,6 +432,8 @@ function Board(size) {
 	var _gridSize = size;
 	var _board = new Array(_gridSize);
 
+	var self = this;
+
 	var EMPTY 	= '#';
 	var BLUE 	= 'B';
 	var YELLOW	= 'Y';
@@ -472,10 +473,9 @@ function Board(size) {
 	};
 
 	/**
-	 * @private
 	 * @returns true if the given coordinates are out of bounds, else false
 	 */
-	var _isOutOfBounds = function(x, y) {
+	this.isOutOfBounds = function(x, y) {
 		return x < 0 || y < 0 || x >= _gridSize || y >= _gridSize;
 	};
 
@@ -506,7 +506,7 @@ function Board(size) {
 			var block = pointsOfCenters[z];
 			var location = new Point(x + block.x, y + block.y);
 
-			if (_isOutOfBounds(location.x, location.y)) {
+			if (self.isOutOfBounds(location.x, location.y)) {
 				return false;
 			}
 
@@ -516,7 +516,7 @@ function Board(size) {
 					var newY = location.y + j;
 
 					// Check if outside the board, if so continue since no issue
-					if (_isOutOfBounds(newX, newY)) continue;
+					if (self.isOutOfBounds(newX, newY)) continue;
 
 					// If checking self, make sure its empty
 					if (i == 0 && j == 0) {
@@ -556,7 +556,7 @@ function Board(size) {
 		for (var z = 0; z < pointsOfCenters.length; ++z) {
 			var block = pointsOfCenters[z];
 			var location = new Point(x + block.x, y + block.y);
-			if (_isOutOfBounds(location.x, location.y)) {
+			if (self.isOutOfBounds(location.x, location.y)) {
 				return false;
 			}
 			if (location.equals(firstPieceLocation)) {
@@ -611,7 +611,7 @@ function Board(size) {
 						var newLoc = new Point(newX, newY);
 
 						// Check if outside the board, if so not a new move
-						if (_isOutOfBounds(newX, newY)) continue;
+						if (self.isOutOfBounds(newX, newY)) continue;
 
 						if (_board[newX][newY] == EMPTY) {
 							// If it's empty, see if we've checked this spot before
@@ -629,7 +629,7 @@ function Board(size) {
 										var checkY = newY + l;
 
 										// Check if outside the board, if so continue since no issue
-										if (_isOutOfBounds(checkX, checkY)) continue;
+										if (self.isOutOfBounds(checkX, checkY)) continue;
 
 										if (_board[checkX][checkY] == color) {
 											newMoveWorks = false;
@@ -1208,15 +1208,32 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 * @private
 	 * When a piece is placed, all of its squares are no longer an available move for any
 	 * player. Attempts to remove them from every player's list
+	 * As well, removes all possible moves for the current player that are adjacent
+	 * to any of the blocks of the recently placed piece
 	 * @param pos the position of the placed piece
 	 */
 	var _removeAvailableMoves = function(piece, row, column) {
 		var pointsOfCenters = piece.getPointsOfCenters();
 		for (var i = 0; i < pointsOfCenters.length; ++i) {
+			// Remove each block of this piece from all the player's possible moves
 			var block = pointsOfCenters[i];
 			var location = new Point(row + block.x, column + block.y);
 			for (var j = 0; j < _NUM_PLAYERS; ++j) {
 				_players[j].removeAvailableMove(location);
+			}
+			// Remove any adjacent available moves for this player in the + direction
+			for (var k = 1; k > -2; --k) {
+				for (var j = -1; j < 2; ++j) {
+					if (j != k && Math.abs(j) != Math.abs(k)) {
+						var newX = location.x + j;
+						var newY = location.y + k;
+
+						// Check if outside the board, if so continue since no issue
+						if (_gameBoard.isOutOfBounds(newX, newY)) continue;
+
+						_players[_currentPlayer].removeAvailableMove(new Point(newX, newY));
+					}
+				}
 			}
 		}
 	};
