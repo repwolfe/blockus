@@ -304,6 +304,8 @@ function Player(pieces, availableMoves) {
 	var _currentPiece = NONE;
 	var _numAvailableMoves = 1;					// Convenience variable to keep track of how many available moves remain
 	var _availableMoves = availableMoves;		// 2D Array of pieces, where the indices are the board locations
+	var _score = 0;
+	var _stillPlaying = true;
 
 	this.getNumAvailableMoves = function() {
 		return _numAvailableMoves;
@@ -317,6 +319,14 @@ function Player(pieces, availableMoves) {
 		return _currentPiece != NONE;
 	};
 
+	this.getScore = function() {
+		return _score;
+	};
+
+	this.isStillPlaying = function() {
+		return _stillPlaying;
+	};
+
 	this.getCurrentPiece = function() {
 		return _availablePieces[_currentPiece];
 	};
@@ -327,11 +337,22 @@ function Player(pieces, availableMoves) {
 
 	/**
 	 * Removes the current piece from the available pieces
-	 * and returns it
+	 * and returns it. Also updates the score
 	 */
 	this.placeCurrentPiece = function() {
 		var piece = _availablePieces.splice(_currentPiece, 1)[0];
 		_currentPiece = NONE;
+		
+		// Add piece's number of blocks to the score
+		var numBlocks = piece.numSquares();
+		_score += numBlocks;
+
+		// If their last move was the 1 piece, double their score
+		if (_availablePieces.length == 0 && numBlocks == 1) {
+			_score *= 2;
+			_stillPlaying = false;
+		}
+
 		return piece;
 	}
 
@@ -384,11 +405,15 @@ function Player(pieces, availableMoves) {
 
 	/**
 	 * Removes the available move stored at the given location
+	 * If their number of available moves is now 0, they are no longer playing
 	 */
 	this.removeAvailableMove = function(pos) {
 		if (_availableMoves[pos.x][pos.y] != null) {
 			_availableMoves[pos.x][pos.y] = null;
-			--_numAvailableMoves;
+			if (--_numAvailableMoves == 0) {
+				_stillPlaying = false;
+				// TODO: Check if they have available moves but no piece can fit there
+			}
 		}
 	};
 
@@ -713,6 +738,8 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 
 	var _lightPlayerColors;
 
+	var _gameOver = false;
+
 	/**
 	 * @private
 	 * Initializes the game
@@ -763,6 +790,24 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			p.setLocation(new Point(pos[0], pos[1]));
 		}
 		return p;
+	};
+
+	/**
+	 * @private
+	 * Makes the next player who is still playing have their turn
+	 */
+	var _nextPlayer = function () {
+		var numAttempts = 0;
+		do {
+			_currentPlayer = (_currentPlayer + 1) % 4;
+			if (++numAttempts > _NUM_PLAYERS) {
+				// Game is over
+				alert("Game is over!");		// TODO: Announce the winner
+				_gameOver = true;
+				return;
+			}
+		}
+		while (_players[_currentPlayer].isStillPlaying == false);
 	};
 
 	/**
@@ -981,6 +1026,10 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 *
 	 */
 	this.mouseClicked = function() {
+		if (_gameOver) {
+			return;		// TODO: Make a nicer way of stopping the game from continuing
+		}
+
 		// Potentially clicked on the scroll button at edge of screen
 		if (_mousePosition.x  > (_gl.canvas.width / _gl.canvas.height) * _gridSize - 1) {
 			if (_mousePosition.y < 1) {
@@ -1041,12 +1090,11 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 					_addNewAvailableMoves(_gameBoard.discoverNewAvailableMoves(placedPiece, row, column));
 
 					if (DEBUG) {
-						console.log("B: " + _players[0].getNumAvailableMoves() + " Y: " + _players[1].getNumAvailableMoves() + " R: " + 
-							_players[2].getNumAvailableMoves() + " G: " + _players[3].getNumAvailableMoves());
+						console.log("B: " + _players[0].getScore() + " Y: " + _players[1].getScore() + " R: " + 
+							_players[2].getScore() + " G: " + _players[3].getScore());
 					}
 
-					// Next player
-					_currentPlayer = (_currentPlayer + 1) % 4;
+					_nextPlayer();
 					if (_firstRound && _currentPlayer == 0) {
 						_firstRound = false;
 					}
