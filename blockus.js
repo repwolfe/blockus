@@ -1,4 +1,4 @@
-var DEBUG = true;
+var DEBUG = false;
 
 function Point(x_, y_) {
 	this.x = x_;
@@ -188,9 +188,12 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	 * Removes any flips or rotations
 	 */
 	this.reset = function() {
-		_flipped = false;
 		_rotatePointsOfCenters(-_rotation);	// Rotate back to zero
 		_rotation = 0;
+
+		if (_flipped) {
+			flip();		// Undo the flip
+		}
 	};
 
 	/**
@@ -526,10 +529,7 @@ function Player(name, pieces, availableMoves, moveValidator) {
 	this.removeAvailableMove = function(pos) {
 		if (_availableMoves[pos.x][pos.y] != null) {
 			_availableMoves[pos.x][pos.y] = null;
-			if (--_numAvailableMoves == 0) {
-				_stillPlaying = false;
-				// TODO: Check if they have available moves but no piece can fit there
-			}
+			--_numAvailableMoves;
 		}
 	};
 
