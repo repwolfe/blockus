@@ -25,12 +25,42 @@ function Point(x_, y_) {
 	};
 }
 
+/**
+ * A cloned piece that is used for hyptothetical moves
+ * contains only the information necessary to place pieces, doesn't need the drawing code
+ */
+function TempPiece(loc, pointsOfCenters, getPointsOfCentersFunc, color, getColorFunc, rotateFunc, flipFunc) {
+	var _loc = loc;
+	var _color = color;
+	var _pointsOfCenters = new Array(pointsOfCenters.length);
+
+	// Copy functions of Piece
+	this.getPointsOfCenters = getPointsOfCentersFunc;
+	this.getColor = getColorFunc;
+	this.rotate = rotateFunc;
+	this.flip = flipFunc;
+
+	var _init = function() {
+		for (var i = 0; i < pointsOfCenters.length; ++i) {
+			_pointsOfCenters[i] = pointsOfCenters[i];
+		}
+	};
+
+	_init();
+}
+
+/**
+ * A real piece that is drawn on the board
+ * Can be positioned, rotated, and flipped
+ */
 function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	var _gl = gl;
 	var _shaderProgram = shaderProgram;
 	var _color = color;
 
 	var _loc = new Point(0,0);
+
+	var self = this;
 
 	var _flipped = false;
 	var _rotation = 0;
@@ -87,12 +117,12 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	/**
 	 * @returns how many squares this piece has
 	 */
-	this.numSquares = function() {
+	this.getNumSquares = function() {
 		return _pointsOfCenters.length;
 	};
 
 	/**
-	 *
+	 * @returns the collection of squares this piece has
 	 */
 	this.getPointsOfCenters = function() {
 		return _pointsOfCenters;
@@ -159,8 +189,8 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	 */
 	this.reset = function() {
 		_flipped = false;
+		_rotatePointsOfCenters(-_rotation);	// Rotate back to zero
 		_rotation = 0;
-		_rotatePointsOfCenters(2 * Math.PI - _rotation);	// Rotate back to zero
 	};
 
 	/**
@@ -238,7 +268,7 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	 * @param position [x,y] location of the mouse, in world coordinates
 	 */
 	this.drawAtMouse = function(position) {
-		// Offset the piece so that the bottom left block of the piece is centered
+		// Offset the piece so that the bottom left square of the piece is centered
 		// on the location of the mouse
 		var coefficient = (_flipped ? -1 : 1);
 		var offsetX = -0.5 * coefficient;
@@ -290,15 +320,28 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
 	};
 
+	/**
+	 * Creates a temporary copy of this piece, which can't be drawn
+	 * Only clones the vital information needed to hypothetically place a piece
+	 */
+	this.clone = function() {
+		return new TempPiece(_loc, _pointsOfCenters, self.getPointsOfCenters,
+							 _color, self.getColor,
+							 _rotatePointsOfCenters, _flipPointsOfCenters);
+	};
+
 	_init(vertices, indices, pointsOfCenters);
 }
 
 /**
  * Represents an individual player
+ * @param name the Player's dispayable name
  * @param pieces a list of the pieces at this player's disposal
  * @param availableMoves a ready made container that is set up to store available moves
+ * @param moveValidator a function that allows a player to check if a hypothetical move is valid
  */
-function Player(pieces, availableMoves) {
+function Player(name, pieces, availableMoves, moveValidator) {
+	var _name = name;
 	var _availablePieces = pieces;
 	var NONE = -1;
 	var _currentPiece = NONE;
@@ -306,10 +349,8 @@ function Player(pieces, availableMoves) {
 	var _availableMoves = availableMoves;		// 2D Array of pieces, where the indices are the board locations
 	var _score = 0;
 	var _stillPlaying = true;
-
-	this.getNumAvailableMoves = function() {
-		return _numAvailableMoves;
-	};
+	var _moveValidator = moveValidator;			// function which checks if hypothetical moves are valid
+	var _latestNumSquaresPlaced = 0;
 
 	this.getNumAvailablePieces = function() {
 		return _availablePieces.length;
@@ -317,6 +358,10 @@ function Player(pieces, availableMoves) {
 
 	this.hasPieceSelected = function() {
 		return _currentPiece != NONE;
+	};
+
+	this.getName = function() {
+		return _name;
 	};
 
 	this.getScore = function() {
@@ -343,18 +388,89 @@ function Player(pieces, availableMoves) {
 		var piece = _availablePieces.splice(_currentPiece, 1)[0];
 		_currentPiece = NONE;
 		
-		// Add piece's number of blocks to the score
-		var numBlocks = piece.numSquares();
-		_score += numBlocks;
-
-		// If their last move was the 1 piece, double their score
-		if (_availablePieces.length == 0 && numBlocks == 1) {
-			_score *= 2;
-			_stillPlaying = false;
-		}
+		// Add piece's number of squares to the score
+		_latestNumSquaresPlaced = piece.getNumSquares();
+		_score += _latestNumSquaresPlaced;
 
 		return piece;
-	}
+	};
+
+	/**
+	 * Based off of various scenarios, determines if this player can no longer make any moves
+	 */
+	this.determineIfStillPlaying = function() {
+		// Simplest scenario where the player is finished: if there are no more pieces to place,
+		// or there is no place even the 1 square piece can fit
+		if (_availablePieces.length != 0 && _numAvailableMoves != 0) {
+			// If the above scenario isn't true, then check if any of the remaining pieces can fit
+			// somewhere, if not then the player is done
+
+			// NOTE: The following efficiency tricks assume that the available pieces array is sorted smallest to largest
+
+			// If they still have their 1 piece, then no matter what if there are available moves then it can fit
+			if (_availablePieces[0].getNumSquares() == 1) {
+				return;
+			}
+
+			// TODO: Maybe do something simple for 2 piece?
+
+			// Otherwise, go through all the pieces with the hope that one of the smallest pieces fit somewhere
+			// Worst case is their last piece only fits in the last spot checked, so have to check all combinations (unlikely)
+			for (var pieceI = 0; pieceI < _availablePieces.length; ++pieceI) {
+				var piece = _availablePieces[pieceI];
+				var numSquares = piece.getNumSquares();
+
+				var boardSize = _availableMoves.length;
+				var copy = piece.clone();		// Modify a copy to test hypothetical moves
+				var xOffset = 0;
+				var yOffset = 0;
+				var NUM_ROTATIONS = 4;
+				var NUM_FLIPS = 1;
+				var rotation = Math.PI / 2;
+
+				// Loop through each available move (ie: a square that must be touched by any newly placed piece)
+				for (var y = 0; y < boardSize; ++y) {
+					for (var x = 0; x < boardSize; ++x) {
+						if (_availableMoves[x][y] != null) {
+							// Attempt all possible ways this piece can touch this spot. For each square of the piece,
+							// attempt to have it touch the spot by trying all 4 rotations * 2 flip orientations
+							// So for each available move the maximum number of checks is = numSquares * 4 * 2
+							for (var squareI = 0; squareI < numSquares; ++squareI) {
+								for (var i = 0; i < NUM_FLIPS; ++i) {
+									for (var j = 0; j < NUM_ROTATIONS; ++j) {
+										var squares = copy.getPointsOfCenters();		// Get the updated square locations
+										var square = squares[squareI];					// Get the current square to place at (x,y)
+										var firstSquare = squares[0];
+
+										// Move validator expects the location of the first square, so
+										// find out where it should go by taking the difference between the two
+										xOffset = square.x - firstSquare.x;
+										yOffset = square.y - firstSquare.y;
+
+										if (_moveValidator(copy, x - xOffset, y - yOffset) == true) {
+											// Can place this piece here in this orientation, player not finished
+											return;
+										}
+										copy.rotate(rotation);
+									}
+									copy.flip();
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		// If got to this point, then the player is done
+		_stillPlaying = false;
+
+		// If their last move was the 1 piece, double their score
+		if (_latestNumSquaresPlaced == 1) {
+			_score *= 2;
+		}
+		
+		alert(_name + " has no more available moves");
+	};
 
 	this.rotateLeft = function() {
 		if (_currentPiece != NONE) {
@@ -526,15 +642,16 @@ function Board(size) {
 	var _validateMove = function(color, pointsOfCenters, x, y) {
 		var touchedCorner = false;		// Must turn true to be a valid move
 
-		// Go through each block of the piece
+		// Go through each square of the piece
 		for (var z = 0; z < pointsOfCenters.length; ++z) {
-			var block = pointsOfCenters[z];
-			var location = new Point(x + block.x, y + block.y);
+			var square = pointsOfCenters[z];
+			var location = new Point(x + square.x, y + square.y);
 
 			if (self.isOutOfBounds(location.x, location.y)) {
 				return false;
 			}
 
+			// Check in all 8 surrounding directions for each square
 			for (var j = 1; j > -2; --j) {
 				for (var i = -1; i < 2; ++i) {
 					var newX = location.x + i;
@@ -554,9 +671,7 @@ function Board(size) {
 						if (touchedCorner) {
 							continue;		// Don't bother checking
 						}
-						else {
-							touchedCorner = (_board[newX][newY] == color);
-						}
+						touchedCorner = (_board[newX][newY] == color);		// else
 					}
 					// If '+' direction, check to see if same same color exists, if so, that's an invalid move
 					else if (_board[newX][newY] == color) {
@@ -571,7 +686,7 @@ function Board(size) {
 
 	/**
 	 * Every piece has a corner that their first move has to touch
-	 * Check if any of the blocks of this piece touch the first location
+	 * Check if any of the squares of this piece touch the first location
 	 * as long as the piece didn't go out of bounds
 	 */
 	var _checkFirstMove = function(color, pointsOfCenters, x, y) {
@@ -579,8 +694,8 @@ function Board(size) {
 		var success = false;
 
 		for (var z = 0; z < pointsOfCenters.length; ++z) {
-			var block = pointsOfCenters[z];
-			var location = new Point(x + block.x, y + block.y);
+			var square = pointsOfCenters[z];
+			var location = new Point(x + square.x, y + square.y);
 			if (self.isOutOfBounds(location.x, location.y)) {
 				return false;
 			}
@@ -593,11 +708,11 @@ function Board(size) {
 		if (success) {
 			_startedMap[color] = true;
 		}
-		return success;		// None of the blocks touched the first location
+		return success;		// None of the squares touched the first location
 	};
 
 	/**
-	 *
+	 * Puts a piece on the game board
 	 */
 	this.placePiece = function(piece, x, y) {
 		var color = _getColorCode(piece);
@@ -623,9 +738,9 @@ function Board(size) {
 		var pointsOfCenters = piece.getPointsOfCenters();
 
 		for (var z = 0; z < pointsOfCenters.length; ++z) {
-			// For each block of a piece, check in X direction for empty space
-			var block = pointsOfCenters[z];
-			var location = new Point(x + block.x, y + block.y);
+			// For each square of a piece, check in X direction for empty space
+			var square = pointsOfCenters[z];
+			var location = new Point(x + square.x, y + square.y);
 
 			for (var j = 1; j > -2; --j) {
 				for (var i = -1; i < 2; ++i) {
@@ -827,6 +942,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 		for (var i = 0; i < _NUM_PLAYERS; ++i) {
 			firstMoves[i] = _createSquarePiece(_lightPlayerColors[i], positions[i]);
 		}
+		var names = ["Blue", "Yellow", "Red", "Green"];
 
 		// Create each player, passing the necessary data
 		for (var i = 0; i < _NUM_PLAYERS; ++i) {
@@ -838,7 +954,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			// Give each player their first move
 			availableMoves[positions[i][0]][positions[i][1]] = firstMoves[i];
 
-			_players = _players.concat(new Player(pieces[i], availableMoves));
+			_players = _players.concat(new Player(names[i], pieces[i], availableMoves, _gameBoard.canPlacePiece));
 			_arrangeAvailablePieces(i);
 		}
 	};
@@ -1088,6 +1204,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 					// Update the available moves list
 					_removeAvailableMoves(placedPiece, row, column);
 					_addNewAvailableMoves(_gameBoard.discoverNewAvailableMoves(placedPiece, row, column));
+					_players[_currentPlayer].determineIfStillPlaying();
 
 					if (DEBUG) {
 						console.log("B: " + _players[0].getScore() + " Y: " + _players[1].getScore() + " R: " + 
@@ -1257,15 +1374,15 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 	 * When a piece is placed, all of its squares are no longer an available move for any
 	 * player. Attempts to remove them from every player's list
 	 * As well, removes all possible moves for the current player that are adjacent
-	 * to any of the blocks of the recently placed piece
+	 * to any of the squares of the recently placed piece
 	 * @param pos the position of the placed piece
 	 */
 	var _removeAvailableMoves = function(piece, row, column) {
 		var pointsOfCenters = piece.getPointsOfCenters();
 		for (var i = 0; i < pointsOfCenters.length; ++i) {
-			// Remove each block of this piece from all the player's possible moves
-			var block = pointsOfCenters[i];
-			var location = new Point(row + block.x, column + block.y);
+			// Remove each square of this piece from all the player's possible moves
+			var square = pointsOfCenters[i];
+			var location = new Point(row + square.x, column + square.y);
 			for (var j = 0; j < _NUM_PLAYERS; ++j) {
 				_players[j].removeAvailableMove(location);
 			}
