@@ -192,7 +192,7 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 		_rotation = 0;
 
 		if (_flipped) {
-			flip();		// Undo the flip
+			this.flip();		// Undo the flip
 		}
 	};
 
