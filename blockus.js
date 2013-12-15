@@ -164,12 +164,14 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 	 * Removes any flips or rotations
 	 */
 	this.reset = function() {
+		// First undo any flips
+		if (_flipped) {
+			this.flip();
+		}
+
+		// And then undo any rotations
 		_rotatePointsOfCenters(-_rotation);	// Rotate back to zero
 		_rotation = 0;
-
-		if (_flipped) {
-			this.flip();		// Undo the flip
-		}
 	};
 
 	/**
@@ -884,12 +886,28 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			_currentPlayer = (_currentPlayer + 1) % 4;
 			if (++numAttempts > _NUM_PLAYERS) {
 				// Game is over
-				alert("Game is over!");		// TODO: Announce the winner
+				var maxScore = 0;
+				var winner;
+				for (var i = 0; i < _NUM_PLAYERS; ++i) {
+					var currentScore = _players[i].getScore();
+					if (currentScore > maxScore) {
+						maxScore = currentScore;
+						winner = _players[i].getName();
+					}
+				}
+				alert("Game is over! Winner is: " + winner);		// TODO: Announce the winner
 				_gameOver = true;
 				return;
 			}
 		}
 		while (_players[_currentPlayer].isStillPlaying() == false);
+
+		// See if this player actually has any moves left
+		_players[_currentPlayer].determineIfStillPlaying();
+
+		if (_players[_currentPlayer].isStillPlaying() == false) {
+			_nextPlayer();		// Try again
+		}
 	};
 
 	/**
@@ -1171,7 +1189,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 					// Update the available moves list
 					_removeAvailableMoves(placedPiece, row, column);
 					_addNewAvailableMoves(_gameBoard.discoverNewAvailableMoves(placedPiece, row, column));
-					_players[_currentPlayer].determineIfStillPlaying();
 
 					if (DEBUG) {
 						console.log("B: " + _players[0].getScore() + " Y: " + _players[1].getScore() + " R: " + 
