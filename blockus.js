@@ -42,7 +42,7 @@ function TempPiece(loc, pointsOfCenters, getPointsOfCentersFunc, color, getColor
 
 	var _init = function() {
 		for (var i = 0; i < pointsOfCenters.length; ++i) {
-			_pointsOfCenters[i] = pointsOfCenters[i];
+			_pointsOfCenters[i] = new Point(pointsOfCenters[i].x, pointsOfCenters[i].y);
 		}
 	};
 
