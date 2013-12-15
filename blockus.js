@@ -26,30 +26,6 @@ function Point(x_, y_) {
 }
 
 /**
- * A cloned piece that is used for hyptothetical moves
- * contains only the information necessary to place pieces, doesn't need the drawing code
- */
-function TempPiece(loc, pointsOfCenters, getPointsOfCentersFunc, color, getColorFunc, rotateFunc, flipFunc) {
-	var _loc = loc;
-	var _color = color;
-	var _pointsOfCenters = new Array(pointsOfCenters.length);
-
-	// Copy functions of Piece
-	this.getPointsOfCenters = getPointsOfCentersFunc;
-	this.getColor = getColorFunc;
-	this.rotate = rotateFunc;
-	this.flip = flipFunc;
-
-	var _init = function() {
-		for (var i = 0; i < pointsOfCenters.length; ++i) {
-			_pointsOfCenters[i] = new Point(pointsOfCenters[i].x, pointsOfCenters[i].y);
-		}
-	};
-
-	_init();
-}
-
-/**
  * A real piece that is drawn on the board
  * Can be positioned, rotated, and flipped
  */
@@ -323,16 +299,6 @@ function Piece(gl, shaderProgram, color, vertices, indices, pointsOfCenters) {
 		_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, null);
 	};
 
-	/**
-	 * Creates a temporary copy of this piece, which can't be drawn
-	 * Only clones the vital information needed to hypothetically place a piece
-	 */
-	this.clone = function() {
-		return new TempPiece(_loc, _pointsOfCenters, self.getPointsOfCenters,
-							 _color, self.getColor,
-							 _rotatePointsOfCenters, _flipPointsOfCenters);
-	};
-
 	_init(vertices, indices, pointsOfCenters);
 }
 
@@ -424,7 +390,6 @@ function Player(name, pieces, availableMoves, moveValidator) {
 				var numSquares = piece.getNumSquares();
 
 				var boardSize = _availableMoves.length;
-				var copy = piece.clone();		// Modify a copy to test hypothetical moves
 				var xOffset = 0;
 				var yOffset = 0;
 				var NUM_ROTATIONS = 4;
@@ -441,7 +406,7 @@ function Player(name, pieces, availableMoves, moveValidator) {
 							for (var squareI = 0; squareI < numSquares; ++squareI) {
 								for (var i = 0; i < NUM_FLIPS; ++i) {
 									for (var j = 0; j < NUM_ROTATIONS; ++j) {
-										var squares = copy.getPointsOfCenters();		// Get the updated square locations
+										var squares = piece.getPointsOfCenters();		// Get the updated square locations
 										var square = squares[squareI];					// Get the current square to place at (x,y)
 										var firstSquare = squares[0];
 
@@ -450,18 +415,20 @@ function Player(name, pieces, availableMoves, moveValidator) {
 										xOffset = square.x - firstSquare.x;
 										yOffset = square.y - firstSquare.y;
 
-										if (_moveValidator(copy, x - xOffset, y - yOffset) == true) {
+										if (_moveValidator(piece, x - xOffset, y - yOffset) == true) {
 											// Can place this piece here in this orientation, player not finished
+											piece.reset();		// Undo any changes
 											return;
 										}
-										copy.rotate(rotation);
+										piece.rotateLeft(rotation);
 									}
-									copy.flip();
+									piece.flip();
 								}
 							}
 						}
 					}
 				}
+				piece.reset();		// Undo any changes
 			}
 		}
 		// If got to this point, then the player is done
@@ -922,7 +889,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 				return;
 			}
 		}
-		while (_players[_currentPlayer].isStillPlaying == false);
+		while (_players[_currentPlayer].isStillPlaying() == false);
 	};
 
 	/**
