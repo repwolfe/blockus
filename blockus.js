@@ -323,6 +323,14 @@ function Player(name, pieces, availableMoves, moveValidator) {
 	var _moveValidator = moveValidator;			// function which checks if hypothetical moves are valid
 	var _latestNumSquaresPlaced = 0;
 
+	// DEBUG
+	var _possibleMove;
+
+	this.getPossibleMove = function() {
+		return _possibleMove;
+	};
+	//
+
 	this.getNumAvailablePieces = function() {
 		return _availablePieces.length;
 	};
@@ -347,8 +355,21 @@ function Player(name, pieces, availableMoves, moveValidator) {
 		return _availablePieces[_currentPiece];
 	};
 
+	/**
+	 * If pased a valid piece #, resets the current one and sets to it
+	 * If not, makes nothing selected
+	 */
 	this.setCurrentPiece = function(piece) {
-		_currentPiece = piece;
+		if (_currentPiece != NONE) {
+			_availablePieces[_currentPiece].reset();
+		}
+		
+		if (piece < _availablePieces.length) {
+			_currentPiece = piece;
+		}
+		else {
+			_currentPiece = NONE;
+		}
 	};
 
 	/**
@@ -419,6 +440,17 @@ function Player(name, pieces, availableMoves, moveValidator) {
 
 										if (_moveValidator(piece, x - xOffset, y - yOffset) == true) {
 											// Can place this piece here in this orientation, player not finished
+
+											// DEBUG!
+											_possibleMove = {};
+											_possibleMove.x = x;
+											_possibleMove.y = y;
+											_possibleMove.squareI = squareI;
+											_possibleMove.pointsOfCenters = new Array(squares.length);
+											for (var z = 0; z < squares.length; ++z) {
+												_possibleMove.pointsOfCenters[z] = new Point(squares[z].x, squares[z].y);
+											}
+
 											piece.reset();		// Undo any changes
 											return;
 										}
@@ -459,12 +491,6 @@ function Player(name, pieces, availableMoves, moveValidator) {
 	this.flip = function() {
 		if (_currentPiece != NONE) {
 			_availablePieces[_currentPiece].flip();
-		}
-	};
-
-	this.reset = function() {
-		if (_currentPiece != NONE) {
-			_availablePieces[_currentPiece].reset();
 		}
 	};
 
@@ -1097,6 +1123,18 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 				// 'f'
 				_players[_currentPlayer].flip();
 				break;
+			// DEBUG
+			case 71:
+				// 'g'
+				var move = _players[_currentPlayer].getPossibleMove();
+				if (move == null) return;
+				var str = "";
+				for (var i = 0; i < move.pointsOfCenters.length; ++i) {
+					str += "[" + move.pointsOfCenters[i].x + ", " + move.pointsOfCenters[i].y + "]";
+				}
+
+				console.log(str + "\n xy: " + move.x + ", " + move.y + " squareI: " + move.squareI);
+				break;
 		}
 	};
 
@@ -1163,7 +1201,6 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 			var rowNum = Math.floor(	
 				(_gridSize - (_mousePosition.y - _rightPiecesMarginY * _scrollAmount)) / _rightPiecesMarginY
 			);
-			_players[_currentPlayer].reset();
 			_players[_currentPlayer].setCurrentPiece(rowNum * 2 + columnNum);
 		}
 		// Clicked on the board
