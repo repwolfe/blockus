@@ -363,7 +363,7 @@ function Player(name, pieces, availableMoves, moveValidator) {
 		if (_currentPiece != NONE) {
 			_availablePieces[_currentPiece].reset();
 		}
-		
+
 		if (piece < _availablePieces.length) {
 			_currentPiece = piece;
 		}
@@ -468,8 +468,8 @@ function Player(name, pieces, availableMoves, moveValidator) {
 		// If got to this point, then the player is done
 		_stillPlaying = false;
 
-		// If their last move was the 1 piece, double their score
-		if (_latestNumSquaresPlaced == 1) {
+		// If they used all their pieces and their last move was the 1 piece, double their score
+		if (_availablePieces.length == 0 _latestNumSquaresPlaced == 1) {
 			_score *= 2;
 		}
 		
@@ -921,7 +921,7 @@ function Blockus(gl, shaderProgram, gridSize, pieces) {
 						winner = _players[i].getName();
 					}
 				}
-				alert("Game is over! Winner is: " + winner);		// TODO: Announce the winner
+				alert("Game is over! Winner is: " + winner);
 				_gameOver = true;
 				return;
 			}
