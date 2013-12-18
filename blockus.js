@@ -469,7 +469,7 @@ function Player(name, pieces, availableMoves, moveValidator) {
 		_stillPlaying = false;
 
 		// If they used all their pieces and their last move was the 1 piece, double their score
-		if (_availablePieces.length == 0 _latestNumSquaresPlaced == 1) {
+		if (_availablePieces.length == 0 && _latestNumSquaresPlaced == 1) {
 			_score *= 2;
 		}
 		
