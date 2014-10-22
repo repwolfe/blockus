@@ -106,17 +106,14 @@ function setMatrixUniforms() {
  */
 function getCursorPosition(e) {
 	var x, y;
-	if (e.pageX || e.pageY) {
-		x = e.pageX;
-		y = e.pageY;
+	if ( event.offsetX == null ) {	// Firefox
+	   x = event.originalEvent.layerX;
+	   y = event.originalEvent.layerY;
 	}
-	else {
-		x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-		y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+	else {	// Other browsers
+	   x = event.offsetX;
+	   y = event.offsetY;
 	}
-	x -= $("canvas").offsetLeft;
-	y -= $("canvas").offsetTop;
-
 	return [x, y];
 }
 
