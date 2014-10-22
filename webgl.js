@@ -3,17 +3,6 @@
  */
 var gl;
 
-function initGL(canvas) {
-	try {
-		gl = canvas.getContext("experimental-webgl");
-		gl.viewportWidth = canvas.width;
-		gl.viewportHeight = canvas.height;
-	} catch (e) {}
-	if (!gl) {
-		alert("Could not initialize WebGL");
-	}
-}
-
 /**
  * Gets the shader object from the scripts
  */
@@ -161,11 +150,15 @@ function tick() {
 var blockus;
 
 function webGLStart() {
-	var canvas = $("canvas");	
+	var canvas = $("canvas");
+	gl = WebGLUtils.setupWebGL(canvas);
+	if (!gl) {
+		return;
+    }
 	canvas.addEventListener("mousemove", canvasMouseMove, false);
 	canvas.addEventListener("mousedown", canvasMouseDown, false);
 	canvas.addEventListener("mouseup", canvasClick, false);
-	initGL(canvas);
+
 	initShaders();
 
 	var gridSize = 20;		// 20x20 board
@@ -173,6 +166,8 @@ function webGLStart() {
 	var pieces = initializePieces(gl, shaderProgram, gridSize);
 	blockus = new Blockus(gl, shaderProgram, gridSize, pieces);
 
+    gl.viewportWidth = canvas.width;
+	gl.viewportHeight = canvas.height;
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 
