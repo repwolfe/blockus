@@ -92,7 +92,7 @@ function degToRad(degrees) {
 	return degrees * Math.PI / 180;
 }
 
-function $(id) {
+function $g(id) {
 	return document.getElementById(id);
 }
 
@@ -147,7 +147,7 @@ function tick() {
 var blockus;
 
 function webGLStart() {
-	var canvas = $("canvas");
+	var canvas = $g("canvas");
 	gl = WebGLUtils.setupWebGL(canvas);
 	if (!gl) {
 		return;
